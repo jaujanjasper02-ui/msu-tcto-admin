@@ -262,7 +262,7 @@ export default function ActivityLogs() {
               <FaHistory className="text-white text-lg" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">Activity Logs</h1>
+              <h1 className="text-xl font-bold text-[#5F0231]">Activity Logs</h1>
               <p className="text-xs text-gray-500">Track all administrative actions</p>
             </div>
           </div>

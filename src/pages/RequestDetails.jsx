@@ -2,15 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import { ConfirmationModal } from '../components/Modal';
+import { 
+  FaArrowLeft, 
+  FaUser, 
+  FaFileAlt, 
+  FaEnvelope, 
+  FaCalendarAlt, 
+  FaCopy,
+  FaMoneyBillWave,
+  FaClock,
+  FaGraduationCap,
+  FaBuilding,
+  FaIdCard,
+  FaUserTag,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaExclamationTriangle,
+  FaBoxOpen,
+  FaSpinner,
+  FaBan,
+  FaHistory,
+  FaInfoCircle
+} from 'react-icons/fa';
 
 const RequestDetails = () => {
-  const { id } = useParams(); // This will be the tracking code (e.g., REQ-20260305-8047)
+  const { id } = useParams();
   
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('');
-  const [notes, setNotes] = useState('');
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -19,135 +40,85 @@ const RequestDetails = () => {
   const [emailMessage, setEmailMessage] = useState('');
   const [isRestricted, setIsRestricted] = useState(false);
   const [updating, setUpdating] = useState(false);
+  
+  // 🆕 Toast notification
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
 
   const API_BASE_URL = 'http://localhost:5000/api';
 
-  // Restricted documents list
   const RESTRICTED_DOCUMENTS = [
-    'Transcript of Records (TOR)',
-    'Diploma',
-    'CAV',
-    'Authentication',
-    'Transfer Credential',
-    'Honorable Dismissal',
-    'Form 137',
-    'Certificate of Graduation'
+    'Transcript of Records (TOR)', 'Diploma', 'CAV', 'Authentication',
+    'Transfer Credential', 'Honorable Dismissal', 'Form 137', 'Certificate of Graduation'
   ];
 
-  // Fetch request data
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 4000);
+  };
+
   useEffect(() => {
     const fetchRequest = async () => {
       setLoading(true);
       try {
         const token = localStorage.getItem('authToken');
-        
         if (!token) {
           setError('You are not logged in. Please login to continue.');
           setLoading(false);
           return;
         }
 
-        console.log('🔍 Fetching request with tracking code:', id);
-
         const response = await fetch(`${API_BASE_URL}/requests/requestbyid/${id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
 
         const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || 'Failed to fetch request');
 
-        if (!response.ok) {
-          throw new Error(data.message || data.error || 'Failed to fetch request');
-        }
-
-        console.log('✅ Request data received:', data);
         setRequest(data);
         setStatus(data.status);
         
-        // Check if this request is restricted
         const restricted = data.studentType === 'Student' && 
                           RESTRICTED_DOCUMENTS.some(doc => data.documentType.includes(doc));
         setIsRestricted(restricted);
 
       } catch (err) {
-        console.error('❌ Error fetching request:', err);
         setError(err.message || 'Failed to load request details');
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) {
-      fetchRequest();
-    }
+    if (id) fetchRequest();
   }, [id]);
 
-  // Function to get year display based on student type
   const getYearDisplay = () => {
     if (!request) return 'N/A';
-    if (request.studentType === 'Alumni') {
-      return `Graduated ${request.yearGraduated || 'N/A'}`;
-    }
+    if (request.studentType === 'Alumni') return `Graduated ${request.yearGraduated || 'N/A'}`;
     return request.yearLevel || 'N/A';
   };
 
-  // Email Templates (removed SMS)
   const emailTemplates = {
-    approved: `Your request {REQ_ID} for {DOCUMENT} is APPROVED and now PROCESSING.
-Amount to pay: ₱{AMOUNT}
-Payment: Pay at Cashier Office on your claim date.
-Processing time: {PROCESSING_TIME}
-We will notify you once ready for pickup.
-Thank you!`,
-    ready: `Your {DOCUMENT} is READY FOR PICKUP!
-1. Go to Cashier Office: Pay ₱{AMOUNT} & get Official Receipt
-2. Go to Registrar Office: Present OR + Valid ID
-3. Claim your document
-Claim within 30 days.
-Thank you!`,
-    rejected: `Your request {REQ_ID} for {DOCUMENT} has been REJECTED.
-Reason: {REASON}
-If you have questions, please contact the Registrar's Office.
-Thank you.`
+    approved: `Your request {REQ_ID} for {DOCUMENT} is APPROVED and now PROCESSING.\nAmount to pay: ₱{AMOUNT}\nPayment: Pay at Cashier Office on your claim date.\nProcessing time: {PROCESSING_TIME}\nWe will notify you once ready for pickup.\nThank you!`,
+    ready: `Your {DOCUMENT} is READY FOR PICKUP!\n1. Go to Cashier Office: Pay ₱{AMOUNT} & get Official Receipt\n2. Go to Registrar Office: Present OR + Valid ID\n3. Claim your document\nClaim within 30 days.\nThank you!`,
+    rejected: `Your request {REQ_ID} for {DOCUMENT} has been REJECTED.\nReason: {REASON}\nIf you have questions, please contact the Registrar's Office.\nThank you.`
   };
 
-  // ===========================================
-  // UPDATE STATUS FUNCTION
-  // ===========================================
   const updateStatus = async (newStatus, reason = null) => {
     try {
       const token = localStorage.getItem('authToken');
-      
-      const payload = {
-        status: newStatus,
-        ...(reason && { reason })
-      };
-
-      console.log(`📤 Updating status to ${newStatus}:`, payload);
+      const payload = { status: newStatus, ...(reason && { reason }) };
 
       const response = await fetch(`${API_BASE_URL}/requests/${id}/status`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to update status');
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update status');
-      }
-
-      console.log(`✅ Status updated to ${newStatus}:`, data);
-
-      // Update local state
       setStatus(newStatus);
       
-      // Add to history
       const newHistory = {
         status: newStatus,
         timestamp: new Date().toISOString(),
@@ -160,22 +131,16 @@ Thank you.`
         reason: reason
       };
       
-      setRequest(prev => ({
-        ...prev,
-        history: [newHistory, ...(prev.history || [])]
-      }));
-
+      setRequest(prev => ({ ...prev, history: [newHistory, ...(prev.history || [])] }));
       return true;
 
     } catch (err) {
-      console.error(`❌ Error updating to ${newStatus}:`, err);
       throw err;
     }
   };
 
   const handleStatusChange = (newStatus) => {
     setSelectedStatus(newStatus);
-    
     if (newStatus === 'approved') {
       setEmailMessage(emailTemplates.approved
         .replace('{REQ_ID}', request.id)
@@ -191,24 +156,17 @@ Thank you.`
     }
   };
 
-  const handleRejectClick = () => {
-    setShowRejectModal(true);
-  };
-
-  const handleClaimClick = () => {
-    setShowClaimModal(true);
-  };
+  const handleRejectClick = () => setShowRejectModal(true);
+  const handleClaimClick = () => setShowClaimModal(true);  // ✅ FIXED
 
   const confirmReject = async () => {
     if (!rejectReason.trim()) {
-      alert('Please provide a reason for rejection');
+      showToast('Please provide a reason for rejection', 'error');
       return;
     }
-    
     const success = await updateStatus('rejected', rejectReason);
-    
     if (success) {
-      alert(`❌ Request rejected.\n✅ Notification sent to ${request.email}\n\nReason: ${rejectReason}`);
+      showToast(`Request rejected. Notification sent to ${request.email}`, 'success');
       setShowRejectModal(false);
       setRejectReason('');
     }
@@ -216,40 +174,26 @@ Thank you.`
 
   const confirmClaim = async () => {
     const success = await updateStatus('claimed');
-    
     if (success) {
-      alert(`✅ Request marked as claimed. No notification sent to student.`);
+      showToast('✅ Request marked as claimed. No notification sent to student.', 'info');
       setShowClaimModal(false);
     }
   };
 
   const confirmStatusChange = async () => {
     setUpdating(true);
-    
     try {
       if (selectedStatus === 'approved') {
-        console.log('📤 Step 1: Updating to approved');
-        const approvedResult = await updateStatus('approved');
-        
-        if (approvedResult) {
-          console.log('📤 Step 2: Updating to processing');
-          const processingResult = await updateStatus('processing');
-          
-          if (processingResult) {
-            alert(`✅ Email sent to ${request.email}\n\nMessage:\n${emailMessage}`);
-          }
-        }
+        await updateStatus('approved');
+        await updateStatus('processing');
+        showToast(`Email sent to ${request.email}`, 'success');
       } else if (selectedStatus === 'ready') {
-        const success = await updateStatus('ready');
-        if (success) {
-          alert(`✅ Email sent to ${request.email}\n\nMessage:\n${emailMessage}`);
-        }
+        await updateStatus('ready');
+        showToast(`Email sent to ${request.email}`, 'success');
       }
-      
       setShowStatusModal(false);
     } catch (error) {
-      console.error('❌ Error in status update:', error);
-      alert('Failed to update status');
+      showToast('Failed to update status', 'error');
     } finally {
       setUpdating(false);
     }
@@ -257,21 +201,18 @@ Thank you.`
 
   const getUserTypeBadge = (type) => {
     switch(type) {
-      case 'Student':
-        return 'bg-blue-100 text-blue-800';
-      case 'Alumni':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'Student': return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white';
+      case 'Alumni': return 'bg-gradient-to-r from-purple-500 to-purple-600 text-white';
+      default: return 'bg-gray-500 text-white';
     }
   };
 
   if (loading) {
     return (
-      <div className="p-6 flex justify-center items-center min-h-screen">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-maroon-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading request details...</p>
+          <div className="w-10 h-10 border-3 border-[#7A0019] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500 text-sm font-medium">Loading request details...</p>
         </div>
       </div>
     );
@@ -279,383 +220,254 @@ Thank you.`
 
   if (error || !request) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-          <svg className="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 className="text-lg font-medium text-red-800 mb-2">Failed to Load Request</h3>
-          <p className="text-red-600 mb-4">{error || 'Request not found'}</p>
-          <Link 
-            to="/admin/requests"
-            className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Back to Requests
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaExclamationTriangle className="text-red-500 text-2xl" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">Failed to Load Request</h3>
+          <p className="text-gray-500 mb-6">{error || 'Request not found'}</p>
+          <Link to="/admin/requests" className="inline-flex items-center px-5 py-2.5 bg-[#7A0019] text-white rounded-lg font-medium hover:bg-[#5a0012] transition">
+            <FaArrowLeft className="mr-2" /> Back to Requests
           </Link>
         </div>
       </div>
     );
   }
 
+  const statusSteps = [
+    { key: 'pending', label: 'Pending', icon: <FaClock /> },
+    { key: 'approved', label: 'Approved', icon: <FaCheckCircle /> },
+    { key: 'processing', label: 'Processing', icon: <FaSpinner /> },
+    { key: 'ready', label: 'Ready', icon: <FaBoxOpen /> },
+    { key: 'claimed', label: 'Claimed', icon: <FaCheckCircle /> }
+  ];
+
+  const currentStepIndex = statusSteps.findIndex(s => s.key === status);
+
   return (
-    <div className="space-y-6">
-      {/* Header with Back Button */}
-      <div>
-        <Link 
-          to="/admin/requests" 
-          className="inline-flex items-center text-sm text-gray-600 hover:text-[#7A0019] mb-4"
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Requests
-        </Link>
+    <div className="min-h-screen bg-gray-50">
+      {/* 🆕 Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-slide-in text-white text-sm font-medium ${
+          toast.type === 'success' ? 'bg-emerald-500' : 
+          toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+        }`}>
+          {toast.type === 'success' ? <FaCheckCircle /> : toast.type === 'error' ? <FaExclamationTriangle /> : <FaInfoCircle />}
+          {toast.message}
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 py-6">
         
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-gray-900">Request Details</h1>
-              <span className="font-mono text-sm bg-gray-100 px-3 py-1 rounded-md text-gray-700">
-                {request.id}
-              </span>
+        {/* Header */}
+        <div className="mb-6">
+          <Link to="/admin/requests" className="inline-flex items-center text-sm text-gray-500 hover:text-[#7A0019] mb-4 transition group">
+            <FaArrowLeft className="mr-2 group-hover:-translate-x-1 transition-transform" />
+            Back to Requests
+          </Link>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                  ['approved','processing'].includes(status) ? 'bg-sky-100 text-sky-600' :
+                  status === 'ready' ? 'bg-purple-100 text-purple-600' :
+                  status === 'claimed' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'
+                }`}>
+                  <FaFileAlt className="text-xl" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-bold text-gray-800">{request.documentType}</h1>
+                    <StatusBadge status={status} size="md" />
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="font-mono text-sm bg-gray-100 px-3 py-1 rounded-lg text-gray-600">{request.id}</span>
+                    <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getUserTypeBadge(request.studentType)}`}>
+                      {request.studentType}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Queue Number Badge */}
+              <div className="flex items-center gap-3">
+                <div className="text-center bg-gradient-to-br from-[#7A0019]/5 to-[#0038A8]/5 rounded-xl px-5 py-3 border border-[#7A0019]/10">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Queue #</p>
+                  <p className="text-2xl font-black text-[#7A0019]">{request.queue_number || '—'}</p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <StatusBadge status={status} size="lg" />
-              <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${getUserTypeBadge(request.studentType)}`}>
-                {request.studentType}
-              </span>
+            
+            {/* Status Progress Bar */}
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                {statusSteps.map((step, index) => {
+                  const isCompleted = currentStepIndex >= index && status !== 'rejected';
+                  const isCurrent = statusSteps[currentStepIndex]?.key === step.key;
+                  return (
+                    <div key={step.key} className="flex items-center flex-1 last:flex-none">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition ${
+                        isCompleted ? 'bg-[#7A0019] text-white' : 
+                        isCurrent ? 'bg-[#7A0019]/20 text-[#7A0019] ring-2 ring-[#7A0019]' : 
+                        'bg-gray-100 text-gray-400'
+                      }`}>
+                        {isCompleted ? <FaCheckCircle className="text-xs" /> : index + 1}
+                      </div>
+                      {index < statusSteps.length - 1 && (
+                        <div className={`flex-1 h-0.5 mx-2 transition ${isCompleted ? 'bg-[#7A0019]' : 'bg-gray-200'}`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between mt-2">
+                {statusSteps.map(step => (
+                  <span key={step.key} className="text-[10px] text-gray-400 font-medium">{step.label}</span>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 🔴 RESTRICTED DOCUMENT WARNING */}
-      {isRestricted && (
-        <div className="bg-red-50 border-l-4 border-red-600 rounded-r-lg p-4 shadow-sm">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-bold text-red-800">⚠️ RESTRICTED DOCUMENT</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p className="font-semibold">{request.documentType}</p>
-                <p className="mt-1">
-                  <strong>{request.studentType}</strong> is <span className="underline">NOT ALLOWED</span> to request this document.
+        {/* Restricted Warning */}
+        {isRestricted && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-500 rounded-r-xl p-4">
+            <div className="flex items-start gap-3">
+              <FaBan className="text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-bold text-red-800 text-sm">Restricted Document</p>
+                <p className="text-sm text-red-700 mt-1">
+                  <strong>{request.documentType}</strong> is not available for <strong>{request.studentType}</strong>. Only Alumni can request this document.
                 </p>
-                <p className="mt-1">
-                  ✅ Only <strong>Alumni</strong> can request:
-                </p>
-                <ul className="list-disc list-inside mt-1 ml-2">
-                  <li>Transcript of Records (TOR)</li>
-                  <li>Diploma</li>
-                  <li>CAV</li>
-                  <li>Authentication</li>
-                  <li>Transfer Credential / Honorable Dismissal</li>
-                  <li>Form 137</li>
-                  <li>Certificate of Graduation</li>
-                </ul>
-              </div>
-              <div className="mt-3">
-                <button
-                  onClick={handleRejectClick}
-                  disabled={updating}
-                  className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-md hover:bg-red-700 disabled:opacity-50"
-                >
-                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <button onClick={handleRejectClick} disabled={updating}
+                  className="mt-3 px-4 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition">
                   Reject Request
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Student Information & Document Details */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Student Information */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h2 className="text-base font-semibold text-gray-900">Student Information</h2>
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Student Info */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                <h2 className="font-bold text-gray-800 flex items-center gap-2"><FaUser className="text-[#7A0019]" /> Student Information</h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <InfoItem icon={<FaUserTag />} label="Full Name" value={request.studentName} />
+                  <InfoItem icon={<FaIdCard />} label="Student ID" value={request.studentId} />
+                  <InfoItem icon={<FaBuilding />} label="Department" value={request.department || 'N/A'} />
+                  <InfoItem icon={<FaGraduationCap />} label="Course" value={request.course || 'N/A'} />
+                  <InfoItem icon={<FaCalendarAlt />} label={request.studentType === 'Alumni' ? 'Year Graduated' : 'Year Level'} value={getYearDisplay()} />
+                  <InfoItem icon={<FaEnvelope />} label="Email" value={request.email} isEmail />
+                </div>
+              </div>
             </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Queue Number - Now BEFORE Full Name */}
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Queue Number</p>
-                  <p className="text-sm font-bold text-[#7A0019] text-lg">#{request.queue_number || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Full Name</p>
-                  <p className="text-sm font-medium text-gray-900">{request.studentName}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Student ID</p>
-                  <p className="text-sm font-medium text-gray-900">{request.studentId}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Student Type</p>
-                  <p className="text-sm font-medium">
-                    <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${getUserTypeBadge(request.studentType)}`}>
-                      {request.studentType}
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    {request.studentType === 'Alumni' ? 'Year Graduated' : 'Year Level'}
-                  </p>
-                  <p className="text-sm text-gray-900">{getYearDisplay()}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-xs text-gray-500 mb-1">Course</p>
-                  <p className="text-sm font-medium text-gray-900">{request.course || 'N/A'}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-xs text-gray-500 mb-1">Department/College</p>
-                  <p className="text-sm text-gray-900">{request.department || 'N/A'}</p>
-                </div>
-                {/* Mobile Number - REMOVED */}
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Email Address</p>
-                  <div className="flex items-center text-sm text-blue-600">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <span className="font-medium">{request.email}</span>
+
+            {/* Document Details */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                <h2 className="font-bold text-gray-800 flex items-center gap-2"><FaFileAlt className="text-[#7A0019]" /> Document Details</h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <InfoItem icon={<FaCopy />} label="Copies" value={request.copies} />
+                  <InfoItem icon={<FaMoneyBillWave />} label="Amount" value={`₱${request.amount}`} highlight />
+                  <InfoItem icon={<FaCalendarAlt />} label="Request Date" value={request.requestDate} />
+                  <div className="sm:col-span-3">
+                    <InfoItem icon={<FaFileAlt />} label="Purpose" value={request.purpose} />
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Document Details */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h2 className="text-base font-semibold text-gray-900">Document Details</h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <p className="text-xs text-gray-500 mb-1">Document Type</p>
-                  <div className="flex items-center">
-                    <p className="text-sm font-medium text-gray-900">{request.documentType}</p>
-                    {isRestricted && (
-                      <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-800 text-xs font-medium rounded-full">
-                        ❌ Restricted
-                      </span>
-                    )}
+          {/* Right Column */}
+          <div className="space-y-6">
+            
+            {/* Status Actions */}
+            {!['claimed','rejected'].includes(status) && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                  <h2 className="font-bold text-gray-800">Update Status</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Email sent automatically for Approve & Ready</p>
+                </div>
+                <div className="p-4 space-y-2.5">
+                  {!isRestricted && (
+                    <>
+                      <ActionButton step={1} color="blue" label="Approved & Processing" desc="Approve request & start processing"
+                        disabled={status !== 'pending' || updating} onClick={() => handleStatusChange('approved')} />
+                      <ActionButton step={2} color="purple" label="Ready for Pickup" desc="Document is ready to be claimed"
+                        disabled={!['processing','approved'].includes(status) || updating} onClick={() => handleStatusChange('ready')} />
+                      <ActionButton step={3} color="green" label="Mark as Claimed" desc="Document claimed (no notification sent)"
+                        disabled={status !== 'ready' || updating} onClick={handleClaimClick} />
+                    </>
+                  )}
+                  <div className="relative py-1">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+                    <div className="relative flex justify-center"><span className="bg-white px-2 text-xs text-gray-400">or</span></div>
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Number of Copies</p>
-                  <p className="text-sm text-gray-900">{request.copies}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-xs text-gray-500 mb-1">Purpose</p>
-                  <p className="text-sm text-gray-900">{request.purpose}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Request Date</p>
-                  <p className="text-sm text-gray-900">{request.requestDate}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Processing Time</p>
-                  <p className="text-sm text-gray-900">{request.processingTime}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Amount</p>
-                  <p className="text-sm font-bold text-[#7A0019]">₱{request.amount}</p>
+                  <ActionButton step="✕" color="red" label="Reject Request" desc="Decline this request with reason"
+                    disabled={['claimed','rejected'].includes(status) || updating} onClick={handleRejectClick} />
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+            )}
 
-        {/* Right Column - Status Actions, Email Preview, Activity History */}
-        <div className="space-y-6">
-          
-          {/* Status Actions */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h2 className="text-base font-semibold text-gray-900">Update Status</h2>
-              <p className="text-xs text-gray-500 mt-1">Email will be sent automatically for Approve/Ready</p>
-            </div>
-            <div className="p-6 space-y-3">
-              {isRestricted ? (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-3">
-                  <p className="text-xs text-red-700 font-medium">
-                    ⚠️ Cannot approve this request
-                  </p>
-                  <p className="text-xs text-red-600 mt-1">
-                    {request.documentType} is not available for {request.studentType}.
+            {/* Email Preview */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                <h2 className="font-bold text-gray-800 flex items-center gap-2"><FaEnvelope className="text-[#0038A8]" /> Email Preview</h2>
+              </div>
+              <div className="p-4">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4">
+                  <p className="text-xs text-blue-600 mb-2 font-medium">To: {request.email}</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+                    {status === 'pending' && '⬆️ Select "Approved & Processing" to send notification'}
+                    {['approved','processing'].includes(status) && !isRestricted && emailTemplates.approved
+                      .replace('{REQ_ID}', request.id).replace('{DOCUMENT}', request.documentType)
+                      .replace('{AMOUNT}', request.amount).replace('{PROCESSING_TIME}', request.processingTime)}
+                    {status === 'ready' && !isRestricted && emailTemplates.ready
+                      .replace('{DOCUMENT}', request.documentType).replace('{AMOUNT}', request.amount)}
+                    {status === 'claimed' && '✅ Document claimed — No notification sent'}
+                    {status === 'rejected' && '❌ Request rejected'}
                   </p>
                 </div>
-              ) : null}
-              
-              {/* 1. Approved and Processing */}
-              <button
-                onClick={() => handleStatusChange('approved')}
-                disabled={status !== 'pending' || isRestricted || updating}
-                className={`w-full flex items-center px-4 py-3 text-sm rounded-md transition-colors ${
-                  status !== 'pending' || isRestricted || updating
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                }`}
-              >
-                <span className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mr-3 text-white text-xs font-bold">
-                  1
-                </span>
-                <div className="flex-1 text-left">
-                  <p className="font-medium">✓ Approved and Processing</p>
-                  <p className="text-xs opacity-75">Approve request & start processing</p>
-                </div>
-              </button>
-              
-              {/* 2. Ready for Pickup */}
-              <button
-                onClick={() => handleStatusChange('ready')}
-                disabled={!(status === 'processing' || status === 'approved') || isRestricted || updating}
-                className={`w-full flex items-center px-4 py-3 text-sm rounded-md transition-colors ${
-                  !(status === 'processing' || status === 'approved') || isRestricted || updating
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
-                }`}
-              >
-                <span className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center mr-3 text-white text-xs font-bold">
-                  2
-                </span>
-                <div className="flex-1 text-left">
-                  <p className="font-medium">📦 Ready for Pickup</p>
-                  <p className="text-xs opacity-75">Document is ready to be claimed</p>
-                </div>
-              </button>
-              
-              {/* 3. Mark as Claimed */}
-              <button
-                onClick={handleClaimClick}
-                disabled={status !== 'ready' || isRestricted || updating}
-                className={`w-full flex items-center px-4 py-3 text-sm rounded-md transition-colors ${
-                  status !== 'ready' || isRestricted || updating
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                }`}
-              >
-                <span className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center mr-3 text-white text-xs font-bold">
-                  3
-                </span>
-                <div className="flex-1 text-left">
-                  <p className="font-medium">✅ Mark as Claimed</p>
-                  <p className="text-xs opacity-75">Document claimed (no notification sent)</p>
-                </div>
-              </button>
-              
-              {/* Divider */}
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-2 text-xs text-gray-400">or</span>
-                </div>
-              </div>
-              
-              {/* 4. Reject Request */}
-              <button
-                onClick={handleRejectClick}
-                disabled={status === 'claimed' || status === 'rejected' || updating}
-                className={`w-full flex items-center px-4 py-3 text-sm rounded-md transition-colors ${
-                  status === 'claimed' || status === 'rejected' || updating
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-                }`}
-              >
-                <span className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center mr-3 text-white text-xs font-bold">
-                  ✕
-                </span>
-                <div className="flex-1 text-left">
-                  <p className="font-medium">Reject Request</p>
-                  <p className="text-xs opacity-75">Decline this request with reason</p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Email Preview (removed SMS) */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h2 className="text-base font-semibold text-gray-900">Email Preview</h2>
-            </div>
-            <div className="p-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start">
-                  <svg className="w-5 h-5 text-blue-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2 text-xs">
-                      <span className="font-medium text-blue-800">To Email: {request.email}</span>
-                    </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-line">
-                      {status === 'pending' && '⬆️ Select "Approved and Processing" to send notification'}
-                      {status === 'approved' && !isRestricted && emailTemplates.approved
-                        .replace('{REQ_ID}', request.id)
-                        .replace('{DOCUMENT}', request.documentType)
-                        .replace('{AMOUNT}', request.amount)
-                        .replace('{PROCESSING_TIME}', request.processingTime)}
-                      {status === 'processing' && !isRestricted && emailTemplates.approved
-                        .replace('{REQ_ID}', request.id)
-                        .replace('{DOCUMENT}', request.documentType)
-                        .replace('{AMOUNT}', request.amount)
-                        .replace('{PROCESSING_TIME}', request.processingTime)}
-                      {status === 'ready' && !isRestricted && emailTemplates.ready
-                        .replace('{DOCUMENT}', request.documentType)
-                        .replace('{AMOUNT}', request.amount)}
-                      {status === 'rejected' && '❌ Request rejected - Reason will be included in notification'}
-                      {status === 'claimed' && '✅ Document claimed - No notification sent'}
-                      {isRestricted && '⚠️ Cannot send notifications for restricted document.'}
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
-          </div>
 
-          {/* Activity History */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h2 className="text-base font-semibold text-gray-900">Activity History</h2>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
+            {/* Activity History */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                <h2 className="font-bold text-gray-800 flex items-center gap-2"><FaHistory className="text-[#7A0019]" /> Activity History</h2>
+              </div>
+              <div className="p-4">
                 {request.history && request.history.length > 0 ? (
-                  request.history.map((item, index) => (
-                    <div key={index} className="relative pl-5 pb-4 last:pb-0">
-                      {index !== request.history.length - 1 && (
-                        <div className="absolute left-[7px] top-2 bottom-0 w-0.5 bg-gray-200"></div>
-                      )}
-                      <div className="absolute left-0 top-1.5 w-2.5 h-2.5 bg-maroon-500 rounded-full"></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{item.action || item.status}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {item.timestamp ? new Date(item.timestamp).toLocaleString() : item.date}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">By: {item.user || item.admin_name || 'System'}</p>
-                        {item.reason && (
-                          <p className="text-xs text-red-600 mt-1">Reason: {item.reason}</p>
+                  <div className="space-y-1">
+                    {request.history.map((item, index) => (
+                      <div key={index} className="relative pl-6 pb-4 last:pb-0">
+                        {index !== request.history.length - 1 && (
+                          <div className="absolute left-[11px] top-3 bottom-0 w-0.5 bg-gray-200"></div>
                         )}
+                        <div className={`absolute left-0 top-2 w-2.5 h-2.5 rounded-full ${item.status === 'rejected' ? 'bg-red-500' : 'bg-[#7A0019]'}`}></div>
+                        <p className="text-sm font-medium text-gray-800">{item.action || item.status}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{item.timestamp ? new Date(item.timestamp).toLocaleString() : item.date}</p>
+                        {item.reason && <p className="text-xs text-red-500 mt-0.5">Reason: {item.reason}</p>}
                       </div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 ) : (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-gray-500">No activity history yet</p>
+                  <div className="text-center py-6">
+                    <FaHistory className="text-gray-300 text-2xl mx-auto mb-2" />
+                    <p className="text-sm text-gray-400">No activity history yet</p>
                   </div>
                 )}
               </div>
@@ -664,57 +476,34 @@ Thank you.`
         </div>
       </div>
 
-      {/* Confirmation Modal for Approve/Ready */}
+      {/* Modals */}
       <ConfirmationModal
-        isOpen={showStatusModal}
-        onClose={() => setShowStatusModal(false)}
-        onConfirm={confirmStatusChange}
+        isOpen={showStatusModal} onClose={() => setShowStatusModal(false)} onConfirm={confirmStatusChange}
         title={selectedStatus === 'approved' ? 'Approve and Process Request' : 'Mark as Ready for Pickup'}
         message={
           <div className="space-y-3">
-            <p>
-              {selectedStatus === 'approved' 
-                ? 'Are you sure you want to approve this request and start processing?' 
-                : 'Are you sure you want to mark this document as ready for pickup?'}
-            </p>
+            <p>{selectedStatus === 'approved' ? 'Approve this request and start processing?' : 'Mark this document as ready for pickup?'}</p>
             {!isRestricted && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                <p className="text-xs font-medium text-yellow-800 mb-2">📧 Notification will be sent to:</p>
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-700">Email: {request.email}</p>
-                </div>
-                <div className="mt-2 pt-2 border-t border-yellow-200">
-                  <p className="text-xs font-medium text-yellow-800 mb-1">Message preview:</p>
-                  <p className="text-xs text-gray-700 whitespace-pre-line">{emailMessage}</p>
-                </div>
+                <p className="text-xs font-medium text-yellow-800 mb-2">📧 Notification will be sent to: {request.email}</p>
+                <p className="text-xs text-gray-700 whitespace-pre-line">{emailMessage}</p>
               </div>
             )}
           </div>
         }
         confirmText={selectedStatus === 'approved' ? 'Yes, Approve & Process' : 'Yes, Mark as Ready'}
-        confirmColor={selectedStatus === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'}
+        confirmColor={selectedStatus === 'approved' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}
         loading={updating}
       />
 
-      {/* Claim Modal - NO NOTIFICATION */}
       <ConfirmationModal
-        isOpen={showClaimModal}
-        onClose={() => setShowClaimModal(false)}
-        onConfirm={confirmClaim}
+        isOpen={showClaimModal} onClose={() => setShowClaimModal(false)} onConfirm={confirmClaim}
         title="Mark as Claimed"
         message={
           <div className="space-y-3">
-            <p className="text-sm text-gray-700">
-              Are you sure you want to mark this document as <span className="font-bold">CLAIMED</span> by the student?
-            </p>
+            <p className="text-sm text-gray-700">Mark <strong>{request.documentType}</strong> as <strong>CLAIMED</strong>?</p>
             <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-              <p className="text-xs text-blue-800">
-                <span className="font-bold">ℹ️ Note:</span> No email notification will be sent for claimed status. This is for internal tracking only.
-              </p>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-              <p className="text-xs font-medium text-yellow-800 mb-1">Document details:</p>
-              <p className="text-xs text-gray-700">{request.documentType} - {request.copies} copy/copies</p>
+              <p className="text-xs text-blue-800">ℹ️ No email notification will be sent. This is for internal tracking only.</p>
             </div>
           </div>
         }
@@ -723,51 +512,23 @@ Thank you.`
         loading={updating}
       />
 
-      {/* Reject Modal with Reason */}
       <ConfirmationModal
-        isOpen={showRejectModal}
-        onClose={() => {
-          setShowRejectModal(false);
-          setRejectReason('');
-        }}
+        isOpen={showRejectModal} onClose={() => { setShowRejectModal(false); setRejectReason(''); }}
         onConfirm={confirmReject}
         title="Reject Request"
         message={
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">
-              Please provide a reason for rejecting this request. This will be included in the email notification.
-            </p>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
-                Rejection Reason <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="e.g., Incomplete requirements, Invalid document request, etc."
-                rows="4"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                autoFocus
-                disabled={updating}
-              />
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-              <p className="text-xs font-medium text-yellow-800 mb-2">📧 Notification will be sent to:</p>
-              <div className="space-y-1">
-                <p className="text-xs text-gray-700">Email: {request.email}</p>
+            <p className="text-sm text-gray-700">Please provide a reason for rejecting this request.</p>
+            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g., Incomplete requirements, Invalid document request..."
+              rows="4" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 outline-none" autoFocus disabled={updating} />
+            {rejectReason && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                <p className="text-xs text-gray-700 whitespace-pre-line">
+                  {emailTemplates.rejected.replace('{REQ_ID}', request.id).replace('{DOCUMENT}', request.documentType).replace('{REASON}', rejectReason)}
+                </p>
               </div>
-              {rejectReason && (
-                <div className="mt-2 pt-2 border-t border-yellow-200">
-                  <p className="text-xs font-medium text-yellow-800 mb-1">Message preview:</p>
-                  <p className="text-xs text-gray-700 whitespace-pre-line">
-                    {emailTemplates.rejected
-                      .replace('{REQ_ID}', request.id)
-                      .replace('{DOCUMENT}', request.documentType)
-                      .replace('{REASON}', rejectReason)}
-                  </p>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         }
         confirmText="Reject Request"
@@ -775,6 +536,42 @@ Thank you.`
         loading={updating}
       />
     </div>
+  );
+};
+
+// 🆕 Helper Components
+const InfoItem = ({ icon, label, value, isEmail, highlight }) => (
+  <div className="flex items-start gap-3">
+    <div className={`mt-0.5 ${highlight ? 'text-[#7A0019]' : 'text-gray-400'}`}>{icon}</div>
+    <div>
+      <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">{label}</p>
+      <p className={`text-sm mt-0.5 ${highlight ? 'text-[#7A0019] font-bold text-lg' : 'text-gray-800 font-medium'} ${isEmail ? 'text-blue-600' : ''}`}>
+        {value || '—'}
+      </p>
+    </div>
+  </div>
+);
+
+const ActionButton = ({ step, color, label, desc, disabled, onClick }) => {
+  const colors = {
+    blue: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+    purple: 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100',
+    green: 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100',
+    red: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+  };
+  const bgColors = { blue: 'bg-blue-600', purple: 'bg-purple-600', green: 'bg-green-600', red: 'bg-red-600' };
+
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className={`w-full flex items-center px-4 py-3 rounded-xl text-sm transition border ${disabled ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : colors[color]}`}>
+      <span className={`w-7 h-7 ${bgColors[color]} rounded-full flex items-center justify-center mr-3 text-white text-xs font-bold flex-shrink-0`}>
+        {step}
+      </span>
+      <div className="flex-1 text-left">
+        <p className="font-semibold">{label}</p>
+        <p className="text-xs opacity-70">{desc}</p>
+      </div>
+    </button>
   );
 };
 

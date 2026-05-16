@@ -77,20 +77,20 @@ const Login = () => {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
             <img 
-              src="/MSU Seal.png" 
+              src="/Msu-Tcto_Logo.jpg" 
               alt="MSU Logo" 
               className="h-16 w-16"
             />
           </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#7A0019] to-[#0038A8] bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#5F0231] to-[#0038A8] bg-clip-text text-transparent">
             MSU-TCTO REGISTRAR
           </h1>
-          <p className="text-[#7A0019] mt-2">Queuing System with Notification</p>
+          <p className="text-[#5F0231] mt-2">Queuing System with Notification</p>
         </div>
 
         {/* Login Card */}
         <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-200">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-[#7A0019] to-[#0038A8] bg-clip-text text-transparent mb-6 text-center">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-[#0038A8] to-[#5F0231] bg-clip-text text-transparent mb-6 text-center">
             Admin Login
           </h2>
           

@@ -132,7 +132,7 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
     <>
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden animate-in fade-in"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={closeSidebar}
         />
       )}
@@ -151,8 +151,8 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
         <div className="relative p-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <img
-              src="/MSU Seal.png"
-              alt="MSU Logo"
+              src="/Msu-Tcto_Logo.jpg"
+              alt="Msu-Tcto_Logo"
               className="h-10 w-10 rounded-lg object-cover"
               onError={(e) => {
                 e.target.onerror = null;
@@ -160,12 +160,11 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
               }}
             />
             <div>
-              <h1 className="font-bold text-[#7A0019] text-lg">MSU-TCTO</h1>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wide">Queuing System with Notification</p>
+              <h1 className="font-bold text-[#5F0231] text-lg">MSU-TCTO</h1>
+              <p className="text-[10px] text-[#285ccc] uppercase tracking-wide">Queuing System with Notification</p>
             </div>
           </div>
           
-          {/* Mobile close button */}
           <button
             onClick={closeSidebar}
             className="absolute top-5 right-4 p-1 lg:hidden text-gray-400 hover:text-[#7A0019] rounded-lg hover:bg-gray-100 transition"
@@ -196,7 +195,6 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
                   {userInfo.role === 'super_admin' ? 'Registrar' : 'Staff'}
                 </span>
               </div>
-              {/* ✅ Display assigned department for staff */}
               {userInfo.role !== 'super_admin' && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500">
                   <FaBuilding className="w-2.5 h-2.5" />
@@ -223,27 +221,26 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
                   }
                 `}
               >
-                {({ isActive }) => isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-[#7A0019] to-[#0038A8] rounded-full"></div>
-                )}
-                
-                <span className={`transition-all duration-200 group-hover:scale-110 ${
-                  ({ isActive }) => isActive ? 'text-[#7A0019]' : 'text-gray-400 group-hover:text-[#7A0019]'
-                }`}>
-                  {item.icon}
-                </span>
-                
-                <div className="flex-1">
-                  <span className="block">{item.label}</span>
-                  <span className="text-[10px] text-gray-400 hidden group-hover:block transition">
-                    {item.description}
-                  </span>
-                </div>
-                
-                {item.label === 'Requests' && pendingCount > 0 && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500 text-white shadow-sm animate-pulse">
-                    {pendingCount}
-                  </span>
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-[#7A0019] to-[#0038A8] rounded-full"></div>
+                    )}
+                    
+                    <span className={`transition-all duration-200 group-hover:scale-110 ${isActive ? 'text-[#7A0019]' : 'text-gray-400 group-hover:text-[#7A0019]'}`}>
+                      {item.icon}
+                    </span>
+                    
+                    <div className="flex-1">
+                      <span className="block">{item.label}</span>
+                    </div>
+                    
+                    {item.label === 'Requests' && pendingCount > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500 text-white shadow-sm">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </>
                 )}
               </NavLink>
             ))}

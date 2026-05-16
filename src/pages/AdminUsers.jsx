@@ -15,16 +15,22 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
-  
+
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
+
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
     department: 'CCS'
   });
 
-  const API_BASE_URL = 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-  // ✅ Department list
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+  };
+
   const departments = [
     { code: 'CCS', name: 'College of Computer Studies (CCS)' },
     { code: 'COED', name: 'College of Education (COED)' },
@@ -59,21 +65,6 @@ const AdminUsers = () => {
     );
   };
 
-  const getRelativeTime = (dateString) => {
-    if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMins = Math.floor((now - date) / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    return date.toLocaleDateString();
-  };
-
   useEffect(() => {
     const userData = localStorage.getItem('currentUser');
     if (userData) {
@@ -97,11 +88,12 @@ const AdminUsers = () => {
     }
   }, [navigate]);
 
+  // ✅ UPDATED: fetch users from /api/admin/users (not /admin-users)
   const fetchAdminUsers = async () => {
     setFetchLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/admin-users`, {
+      const response = await fetch(`${API_BASE_URL}/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -111,7 +103,7 @@ const AdminUsers = () => {
       setAdminUsers(data.users || []);
     } catch (error) {
       console.error('Error fetching admin users:', error);
-      alert('Failed to load staff members');
+      showToast('Failed to load staff members', 'error');
     } finally {
       setFetchLoading(false);
     }
@@ -157,44 +149,54 @@ const AdminUsers = () => {
     }
   ];
 
+  // ✅ UPDATED: POST to /api/admin/users
   const handleAddUser = async () => {
     if (!newUser.name || !newUser.email) {
-      alert('Please fill in required fields');
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(newUser.email)) {
+      showToast('Please enter a valid email address', 'error');
       return;
     }
 
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/admin-users`, {
+      const response = await fetch(`${API_BASE_URL}/admin/users`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(newUser)
+        body: JSON.stringify({ 
+          ...newUser, 
+          role: 'staff'
+        })
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
 
-      alert(`✅ Staff member added successfully! Invitation email sent to ${newUser.email}`);
+      showToast(`Staff member added successfully! Invitation email sent to ${newUser.email}`, 'success');
       setShowAddModal(false);
       setNewUser({ name: '', email: '', department: 'CCS' });
       fetchAdminUsers();
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ UPDATED: PUT to /api/admin/users/:id
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/admin-users/${selectedUser.id}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -212,22 +214,23 @@ const AdminUsers = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
 
-      alert(`✅ Staff member updated successfully`);
+      showToast('Staff member updated successfully', 'success');
       setShowEditModal(false);
       setSelectedUser(null);
       fetchAdminUsers();
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ UPDATED: DELETE to /api/admin/users/:id
   const handleDeleteUser = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/admin-users/${selectedUser.id}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -235,23 +238,24 @@ const AdminUsers = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
 
-      alert(`✅ Staff member removed successfully`);
+      showToast('Staff member removed successfully', 'success');
       setShowDeleteModal(false);
       setSelectedUser(null);
       fetchAdminUsers();
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ UPDATED: POST reset-password to /api/admin/users/:id/reset-password
   const handleResetPassword = async (user) => {
     if (!window.confirm(`Send password reset email to ${user.name}?`)) return;
     
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/admin-users/${user.id}/reset-password`, {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${user.id}/reset-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -263,9 +267,9 @@ const AdminUsers = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
 
-      alert(`✅ Password reset email sent to ${user.email}`);
+      showToast(`Password reset email sent to ${user.email}`, 'success');
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, 'error');
     }
   };
 
@@ -322,7 +326,7 @@ const AdminUsers = () => {
       label: 'Edit',
       onClick: (item) => {
         if (item.role === 'super_admin') {
-          alert('Registrar account cannot be edited');
+          showToast('Registrar account cannot be edited', 'error');
           return;
         }
         setSelectedUser(item);
@@ -348,7 +352,7 @@ const AdminUsers = () => {
       label: 'Delete',
       onClick: (item) => {
         if (item.role === 'super_admin') {
-          alert('Registrar account cannot be deleted');
+          showToast('Registrar account cannot be deleted', 'error');
           return;
         }
         setSelectedUser(item);
@@ -368,10 +372,15 @@ const AdminUsers = () => {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {toast.show && (
+        <div className={`fixed top-20 right-6 z-50 px-4 py-2 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white text-sm`}>
+          {toast.message}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Registrar Office Staff</h1>
+          <h1 className="text-xl font-bold text-[#5F0231]">Registrar Office Staff</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage staff members and their department assignments</p>
         </div>
         
@@ -386,14 +395,12 @@ const AdminUsers = () => {
         </button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((stat, index) => (
           <AdminCard key={index} title={stat.title} value={stat.value} color={stat.color} icon={stat.icon} />
         ))}
       </div>
 
-      {/* Search Bar */}
       <div className="bg-white rounded-lg border border-gray-200 p-3">
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -409,7 +416,6 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      {/* Users Table */}
       <AdminTable
         columns={columns}
         data={filteredUsers}
@@ -417,7 +423,6 @@ const AdminUsers = () => {
         emptyMessage="No staff members found"
       />
 
-      {/* Permissions Info */}
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Access Levels</h3>
         <div className="space-y-2">
@@ -540,7 +545,6 @@ const AdminUsers = () => {
         )}
       </Modal>
 
-      {/* Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}

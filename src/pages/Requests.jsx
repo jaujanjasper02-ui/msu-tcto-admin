@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   FaSearch, 
@@ -16,7 +16,9 @@ import {
   FaBoxOpen,
   FaCheck,
   FaTimes as FaTimesIcon,
-  FaLock
+  FaLock,
+  FaCalendarDay,
+  FaExclamationCircle
 } from 'react-icons/fa';
 
 // ============================================
@@ -68,6 +70,17 @@ const getDepartmentDisplay = (dept) => {
 };
 
 // ============================================
+// HELPER: GET LOCAL DATE STRING (YYYY-MM-DD)
+// ============================================
+const getLocalDateString = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// ============================================
 // MAIN REQUESTS COMPONENT
 // ============================================
 const Requests = () => {
@@ -89,16 +102,20 @@ const Requests = () => {
   });
 
   const [isSearching, setIsSearching] = useState(false);
-  const [nextInLineQueue, setNextInLineQueue] = useState(null);
-  const [actionLoading, setActionLoading] = useState(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [selectedAction, setSelectedAction] = useState(null);
-  const [rejectionReason, setRejectionReason] = useState('');
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [dailyLimit, setDailyLimit] = useState(100);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+  // Local today and yesterday
+  const todayLocal = useMemo(() => getLocalDateString(new Date()), []);
+  const yesterdayLocal = useMemo(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return getLocalDateString(yesterday);
+  }, []);
+
+  // Load user and daily limit
   useEffect(() => {
     const userData = localStorage.getItem('currentUser');
     if (userData) {
@@ -113,127 +130,97 @@ const Requests = () => {
         console.error('Error parsing user:', err);
       }
     }
+    fetchDailyLimit();
   }, []);
+
+  const fetchDailyLimit = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/admin/settings`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDailyLimit(data.settings?.daily_queue_limit || 100);
+      }
+    } catch (err) {
+      console.error('Failed to load daily limit', err);
+    }
+  };
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
   };
 
-  const fetchNextInLine = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) return;
-      
-      const response = await fetch(`${API_BASE_URL}/requests/next-in-line`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setNextInLineQueue(data.nextRequest?.queue_number || null);
+  // ============================
+  // DATA PROCESSING (daily queue, overflow, FIFO)
+  // ============================
+  const processedRequests = useMemo(() => {
+    if (!requests.length) return [];
+
+    // Sort by date ascending, then by queue_number
+    const sorted = [...requests].sort((a, b) => {
+      const dateA = getLocalDateString(a.date);
+      const dateB = getLocalDateString(b.date);
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return a.queue_number - b.queue_number;
+    });
+
+    // Determine overflow for today
+    const enriched = sorted.map(r => {
+      const dateKey = getLocalDateString(r.date);
+      const isToday = dateKey === todayLocal;
+      let isOverflow = false;
+      if (isToday) {
+        const dayRequests = sorted.filter(x => getLocalDateString(x.date) === todayLocal);
+        const index = dayRequests.findIndex(x => x.id === r.id);
+        isOverflow = index >= dailyLimit;
       }
-    } catch (err) {
-      console.error('Failed to fetch next in line:', err);
-    }
-  }, [API_BASE_URL]);
+      return { ...r, displayDate: dateKey, isOverflow };
+    });
+    return enriched;
+  }, [requests, dailyLimit, todayLocal]);
 
+  // Earliest active date among pending/approved/processing
+  const earliestActiveDate = useMemo(() => {
+    const activeDates = processedRequests
+      .filter(r => ['pending','approved','processing'].includes(r.status))
+      .map(r => r.displayDate)
+      .sort();
+    return activeDates[0] || null;
+  }, [processedRequests]);
+
+  // Next in line: smallest queue_number on earliest active date
+  const computedNextInLine = useMemo(() => {
+    if (!earliestActiveDate) return null;
+    const candidates = processedRequests
+      .filter(r => ['pending','approved','processing'].includes(r.status) && r.displayDate === earliestActiveDate)
+      .sort((a,b) => a.queue_number - b.queue_number);
+    return candidates[0]?.queue_number || null;
+  }, [processedRequests, earliestActiveDate]);
+
+  // Now Serving: first request with "processing" status (auto-detect)
+  const displayNowServing = useMemo(() => {
+    const processing = processedRequests.find(r => r.status === 'processing');
+    return processing?.queue_number || null;
+  }, [processedRequests]);
+
+  // Check if a specific request can be processed (FIFO)
   const canProcessRequest = useCallback((request) => {
-  // ✅ Claimed or rejected - hindi na pwedeng i-process
-  if (request.status === 'claimed' || request.status === 'rejected') {
-    return false;
-  }
-  
-  // ✅ Only pending, approved, processing ang pwedeng i-process
-  const activeStatuses = ['pending', 'approved', 'processing'];
-  if (!activeStatuses.includes(request.status)) {
-    return false;
-  }
-  
-  // ✅ Kung walang next in line, puwede (first request)
-  if (!nextInLineQueue) return true;
-  
-  // ✅ Dapat match ang queue number sa next in line
-  return request.queue_number === nextInLineQueue;
-}, [nextInLineQueue]);
+    if (['claimed','rejected'].includes(request.status)) return false;
+    if (!['pending','approved','processing'].includes(request.status)) return false;
+    if (request.displayDate !== earliestActiveDate) return false;
+    return request.queue_number === computedNextInLine;
+  }, [earliestActiveDate, computedNextInLine]);
 
-  const getAvailableActions = useCallback((status, canProcess) => {
-  // ✅ Claimed or rejected - walang actions
-  if (status === 'claimed' || status === 'rejected') {
-    return [];
-  }
-  
-  // ✅ Locked - walang actions (hindi lang "Locked" button)
-  if (!canProcess && (status === 'pending' || status === 'approved' || status === 'processing')) {
-    return [];  // Empty array = walang buttons
-  }
-  
-  const actions = [];
-  
-  switch(status) {
-    case 'pending':
-      actions.push({ action: 'approved', label: 'Approve', icon: <FaCheck className="w-3 h-3" /> });
-      actions.push({ action: 'rejected', label: 'Reject', icon: <FaTimesIcon className="w-3 h-3" /> });
-      break;
-    case 'approved':
-      actions.push({ action: 'processing', label: 'Process', icon: <FaSpinner className="w-3 h-3" /> });
-      actions.push({ action: 'rejected', label: 'Reject', icon: <FaTimesIcon className="w-3 h-3" /> });
-      break;
-    case 'processing':
-      actions.push({ action: 'ready', label: 'Ready', icon: <FaBoxOpen className="w-3 h-3" /> });
-      actions.push({ action: 'rejected', label: 'Reject', icon: <FaTimesIcon className="w-3 h-3" /> });
-      break;
-    case 'ready':
-      actions.push({ action: 'claimed', label: 'Claim', icon: <FaCheck className="w-3 h-3" /> });
-      break;
-    default: break;
-  }
-  return actions;
-}, []);
-
-  const openConfirmModal = (request, action) => {
-    setSelectedRequest(request);
-    setSelectedAction(action);
-    setRejectionReason('');
-    setShowConfirmModal(true);
-  };
-
-  const handleStatusUpdate = async () => {
-    if (!selectedRequest || !selectedAction) return;
-    setActionLoading(selectedRequest.id);
-    
-    try {
-      const token = localStorage.getItem('authToken');
-      const payload = { status: selectedAction };
-      if (selectedAction === 'rejected' && rejectionReason) payload.reason = rejectionReason;
-      
-      const response = await fetch(`${API_BASE_URL}/requests/update-status/${selectedRequest.id}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
-      
-      showToast(`Request ${data.message || 'updated'}`, 'success');
-      fetchRequests();
-      fetchNextInLine();
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setActionLoading(null);
-      setShowConfirmModal(false);
-      setSelectedRequest(null);
-      setSelectedAction(null);
-      setRejectionReason('');
-    }
-  };
-
+  // ============================
+  // FETCHING
+  // ============================
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
     try {
       const token = localStorage.getItem('authToken');
       if (!token) throw new Error('Not authenticated');
@@ -253,17 +240,15 @@ const Requests = () => {
 
       setRequests(data.requests || []);
       setPagination(data.pagination || pagination);
-      await fetchNextInLine();
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, filter, API_BASE_URL, fetchNextInLine]);
+  }, [pagination.page, pagination.limit, filter, API_BASE_URL]);
 
   const searchRequests = useCallback(async (query) => {
     if (!query.trim()) { fetchRequests(); return; }
-    
     setLoading(true);
     setIsSearching(true);
     try {
@@ -271,10 +256,8 @@ const Requests = () => {
       const response = await fetch(`${API_BASE_URL}/requests/search?q=${encodeURIComponent(query)}&page=${pagination.page}&limit=${pagination.limit}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
-      
       setRequests(data.results || []);
       setPagination(prev => ({ ...prev, total: data.total || 0, pages: Math.ceil((data.total || 0) / prev.limit) }));
     } catch (err) {
@@ -333,12 +316,14 @@ const Requests = () => {
     if (isSearching) { setSearchTerm(''); setIsSearching(false); }
   };
 
-  const formatDisplayDate = (dateString) => {
+  // Format display date using LOCAL dates
+  const formatDisplayDate = (dateString, displayDate) => {
     if (!dateString) return '—';
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    if (displayDate === todayLocal) return 'Today';
+    if (displayDate === yesterdayLocal) return 'Yesterday';
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Calculate colspan based on user role
   const colSpan = currentUser.role === 'super_admin' ? 9 : 8;
 
   if (loading && requests.length === 0) {
@@ -364,21 +349,26 @@ const Requests = () => {
     );
   }
 
+  // Format earliest active date for display in banner
+  const earliestActiveDateDisplay = earliestActiveDate
+    ? (earliestActiveDate === todayLocal ? 'Today' : new Date(earliestActiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1400px] mx-auto px-4 py-6">
         
-        {/* Toast Notification */}
+        {/* Toast */}
         {toast.show && (
           <div className={`fixed top-20 right-6 z-50 px-4 py-2 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
             <span className="text-sm">{toast.message}</span>
           </div>
         )}
 
-        {/* ========== HEADER ========== */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Document Requests</h1>
+            <h1 className="text-2xl font-bold text-[#5F0231]">Document Requests</h1>
             <p className="text-sm text-gray-500 mt-0.5">Manage and track all student document requests</p>
           </div>
           <button onClick={fetchRequests} className="px-4 py-2 bg-[#7A0019] text-white text-sm font-medium rounded-lg hover:bg-[#5a0012] transition">
@@ -386,32 +376,38 @@ const Requests = () => {
           </button>
         </div>
 
-        {/* ========== STAFF DEPARTMENT BANNER ========== */}
+        {/* Department Banner */}
         {currentUser.role !== 'super_admin' && (
           <div className="mb-5 bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-700">
               📁 You are managing: <strong>{getDepartmentDisplay(currentUser.department)}</strong> Department
             </p>
-            <p className="text-xs text-blue-600 mt-0.5">
-              You can only see and process requests from this department.
-            </p>
           </div>
         )}
 
-        {/* ========== FIFO INFO BANNER ========== */}
+        {/* Now Serving & Queue Info */}
         <div className="mb-5 bg-amber-50 rounded-lg p-3 border border-amber-200">
           <div className="flex items-center gap-2">
             <FaRegClock className="text-amber-600 text-sm" />
             <p className="text-sm text-amber-800">
-              <strong>FIFO Queue:</strong> Requests must be processed in order.
-              {nextInLineQueue ? (
-                <span className="ml-1">Queue <strong className="bg-emerald-100 px-1.5 py-0.5 rounded">#{nextInLineQueue}</strong> is next in line.</span>
-              ) : ' No pending requests.'}
+              <strong>Now Serving:</strong> {displayNowServing ? (
+                <span className="ml-1 bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">#{displayNowServing}</span>
+              ) : <span className="text-gray-500">None</span>}
             </p>
           </div>
+          <div className="mt-2 text-xs text-amber-700">
+            {earliestActiveDate ? (
+              <>Active requests from: <strong>{earliestActiveDateDisplay}</strong>. Complete all before processing newer ones.</>
+            ) : 'No active requests.'}
+          </div>
+          {computedNextInLine && (
+            <p className="mt-1 text-sm text-amber-800">
+              Next in line: <strong className="bg-amber-200 px-1.5 py-0.5 rounded">#{computedNextInLine}</strong>
+            </p>
+          )}
         </div>
 
-        {/* ========== FILTER BUTTONS ========== */}
+        {/* Filter Buttons */}
         <div className="flex flex-wrap gap-2 mb-4">
           {['all', 'pending', 'processing', 'ready', 'claimed', 'rejected'].map((status) => (
             <button
@@ -433,7 +429,7 @@ const Requests = () => {
           ))}
         </div>
 
-        {/* ========== SEARCH BAR ========== */}
+        {/* Search Bar */}
         <div className="mb-5">
           <div className="relative">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
@@ -452,27 +448,27 @@ const Requests = () => {
           </div>
         </div>
 
-        {/* ========== REQUESTS TABLE ========== */}
+        {/* Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Queue</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Request ID</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Queue</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Request ID</th>
                   {currentUser.role === 'super_admin' && (
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Department</th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Student</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Type</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Document</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Date</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Actions</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {requests.length === 0 ? (
+                {processedRequests.length === 0 ? (
                   <tr>
                     <td colSpan={colSpan} className="px-4 py-12 text-center">
                       <FaFileAlt className="text-gray-300 text-3xl mx-auto mb-2" />
@@ -480,28 +476,40 @@ const Requests = () => {
                     </td>
                   </tr>
                 ) : (
-                  requests.map((request) => {
+                  processedRequests.map((request) => {
                     const restricted = isRestrictedDocument(request.document, request.studentType);
                     const canProcess = canProcessRequest(request);
-                    const isNextInLine = nextInLineQueue === request.queue_number && 
-                     (request.status === 'pending' || request.status === 'approved' || request.status === 'processing');
-                    const isBlocked = !canProcess && (request.status === 'pending' || request.status === 'approved' || request.status === 'processing');
-                    const actions = getAvailableActions(request.status, canProcess);
+                    const isNextInLine = request.queue_number === computedNextInLine && request.displayDate === earliestActiveDate;
+                    const isBlocked = !canProcess && ['pending','approved','processing'].includes(request.status);
                     const deptStyles = getDepartmentStyles(request.department);
+                    const dateLabel = formatDisplayDate(request.date, request.displayDate);
+                    const isOldDate = request.displayDate < todayLocal && ['pending','approved','processing'].includes(request.status);
                     
                     return (
                       <tr key={request.id} className={`border-b border-gray-100 hover:bg-gray-50 ${restricted ? 'bg-rose-50/30' : ''}`}>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center gap-2">
                             <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold ${
                               isNextInLine ? 'bg-emerald-500 text-white' :
                               isBlocked ? 'bg-gray-200 text-gray-400' : 'bg-gray-100 text-gray-700'
                             }`}>#{request.queue_number}</span>
-                            {isBlocked && <span className="text-xs text-gray-400">Locked</span>}
+                            {isBlocked && (
+                              <span className="text-xs text-gray-400 flex items-center gap-1">
+                                <FaLock className="w-3 h-3" />
+                                {isOldDate ? 'Yesterday' : 'Locked'}
+                              </span>
+                            )}
                             {isNextInLine && <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Next</span>}
+                            {request.isOverflow && (
+                              <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded flex items-center gap-1" title="Exceeded daily limit, may be processed later">
+                                <FaExclamationCircle className="w-3 h-3" /> Overflow
+                              </span>
+                            )}
                           </div>
                         </td>
-                        <td className="px-4 py-3"><span className="text-sm font-mono text-[#7A0019]">{request.id}</span></td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-sm font-mono text-[#7A0019]">{request.id}</span>
+                        </td>
                         {currentUser.role === 'super_admin' && (
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${deptStyles.bg} ${deptStyles.text}`}>
@@ -518,31 +526,24 @@ const Requests = () => {
                           <div className="text-sm text-gray-800">{request.document}</div>
                           {restricted && <div className="text-xs text-rose-500">Restricted for students</div>}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{formatDisplayDate(request.date)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <FaCalendarDay className="text-gray-400 w-3 h-3" />
+                            {dateLabel}
+                          </div>
+                        </td>
                         <td className="px-4 py-3"><StatusBadge status={request.status} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <Link to={`/admin/requests/${request.id}`} className="p-1.5 text-gray-400 hover:text-[#7A0019] rounded-lg">
+                        <td className="px-4 py-3 text-center">
+                          {/* Kung naka-lock, walang actions. Kung hindi, eye icon lang. */}
+                          {!isBlocked && (
+                            <Link 
+                              to={`/admin/requests/${request.id}`} 
+                              className="inline-flex items-center justify-center p-2 text-gray-400 hover:text-[#7A0019] hover:bg-gray-100 rounded-lg transition"
+                              title="View Details"
+                            >
                               <FaEye className="w-4 h-4" />
                             </Link>
-                            {actions.map((action) => (
-                              <button
-                                key={action.action}
-                                onClick={() => openConfirmModal(request, action.action)}
-                                disabled={action.disabled || actionLoading === request.id}
-                                className={`px-2 py-1 text-xs font-medium rounded-lg flex items-center gap-1 ${
-                                  action.action === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                  action.action === 'processing' ? 'bg-sky-100 text-sky-700' :
-                                  action.action === 'ready' ? 'bg-purple-100 text-purple-700' :
-                                  action.action === 'claimed' ? 'bg-indigo-100 text-indigo-700' :
-                                  action.action === 'rejected' ? 'bg-rose-100 text-rose-700' :
-                                  'bg-gray-100 text-gray-400'
-                                }`}
-                              >
-                                {action.icon} {action.label}
-                              </button>
-                            ))}
-                          </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -571,37 +572,12 @@ const Requests = () => {
           )}
         </div>
 
-        {/* Restricted Documents Notice */}
+        {/* Restricted Docs Notice */}
         <div className="mt-5 bg-amber-50 rounded-lg p-3 border border-amber-200">
           <p className="text-xs text-amber-700">
             <strong>Note:</strong> TOR, Diploma, CAV, Authentication are NOT AVAILABLE for current students. Only Alumni can request these documents.
           </p>
         </div>
-
-        {/* Confirmation Modal */}
-        {showConfirmModal && selectedRequest && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowConfirmModal(false)}>
-            <div className="bg-white rounded-lg max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-lg font-semibold mb-2">Confirm {selectedAction}</h3>
-              <p className="text-gray-600 mb-4">
-                Mark request <strong>{selectedRequest.id}</strong> as <strong>{selectedAction}</strong>?
-              </p>
-              {selectedAction === 'rejected' && (
-                <textarea 
-                  value={rejectionReason} 
-                  onChange={(e) => setRejectionReason(e.target.value)} 
-                  placeholder="Reason for rejection..."
-                  className="w-full p-2 border rounded-lg mb-4 text-sm"
-                  rows="3"
-                />
-              )}
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setShowConfirmModal(false)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm">Cancel</button>
-                <button onClick={handleStatusUpdate} className="px-4 py-2 bg-[#7A0019] text-white rounded-lg text-sm">Confirm</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
