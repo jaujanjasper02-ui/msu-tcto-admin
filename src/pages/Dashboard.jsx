@@ -9,7 +9,7 @@ import {
   FaRegClock, FaArrowRight, FaChartLine
 } from 'react-icons/fa';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-nta0.onrender.com/api';
 
 const DEFAULT_ACTIVITY = {
   weekly: [0, 0, 0, 0, 0, 0, 0],

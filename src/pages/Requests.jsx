@@ -105,7 +105,7 @@ const Requests = () => {
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [dailyLimit, setDailyLimit] = useState(100);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-nta0.onrender.com/api';
 
   // Local today and yesterday
   const todayLocal = useMemo(() => getLocalDateString(new Date()), []);

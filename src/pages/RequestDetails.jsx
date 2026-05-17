@@ -44,7 +44,7 @@ const RequestDetails = () => {
   // 🆕 Toast notification
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
 
-  const API_BASE_URL = 'http://localhost:5000/api';
+  const API_BASE_URL = 'https://msu-tcto-backend-nta0.onrender.com/api';
 
   const RESTRICTED_DOCUMENTS = [
     'Transcript of Records (TOR)', 'Diploma', 'CAV', 'Authentication',

@@ -12,7 +12,9 @@ import {
   FaTrash,
   FaUserGraduate,
   FaUserTie,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaCheckSquare,
+  FaRegSquare
 } from 'react-icons/fa';
 
 const DEFAULT_DOCUMENT_SETTINGS = [
@@ -37,7 +39,7 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-nta0.onrender.com/api';
 
   const [settings, setSettings] = useState({
     contactEmail: '',
@@ -106,6 +108,7 @@ const Settings = () => {
     }));
   };
 
+  // 🆕 ROLE TOGGLE — GAMIT ANG CHECKBOX LOGIC
   const handleRoleToggle = (id, role) => {
     setSettings(prev => ({
       ...prev,
@@ -149,6 +152,7 @@ const Settings = () => {
     showToast('Document added! Click Save Changes to apply.', 'success');
   };
 
+  // 🆕 NEW DOC ROLE TOGGLE — GAMIT ANG CHECKBOX LOGIC
   const handleNewDocRoleToggle = (role) => {
     setNewDoc(prev => {
       const currentRoles = prev.allowedRoles;
@@ -331,18 +335,20 @@ const Settings = () => {
                   <input type="number" min="1" max="30" value={newDoc.processing_days} onChange={(e) => setNewDoc({...newDoc, processing_days: parseInt(e.target.value)})}
                     className="w-16 px-2 py-2 border border-gray-200 rounded-lg text-sm text-center focus:ring-1 focus:ring-[#7A0019] outline-none" />
                 </div>
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-4 mb-3">
                   <span className="text-xs text-gray-600">For:</span>
-                  <button onClick={() => handleNewDocRoleToggle('student')}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${newDoc.allowedRoles.includes('student') ? 'text-white' : 'bg-gray-200 text-gray-600'}`}
-                    style={newDoc.allowedRoles.includes('student') ? { backgroundColor: '#285ccc' } : {}}>
-                    <FaUserGraduate className="inline mr-1" />Student
-                  </button>
-                  <button onClick={() => handleNewDocRoleToggle('alumni')}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${newDoc.allowedRoles.includes('alumni') ? 'text-white' : 'bg-gray-200 text-gray-600'}`}
-                    style={newDoc.allowedRoles.includes('alumni') ? { backgroundColor: '#780115' } : {}}>
-                    <FaUserTie className="inline mr-1" />Alumni
-                  </button>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={newDoc.allowedRoles.includes('student')} onChange={() => handleNewDocRoleToggle('student')}
+                      className="w-4 h-4 rounded accent-[#285ccc]" />
+                    <FaUserGraduate className="text-[#285ccc] text-sm" />
+                    <span className="text-xs text-gray-700">Student</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={newDoc.allowedRoles.includes('alumni')} onChange={() => handleNewDocRoleToggle('alumni')}
+                      className="w-4 h-4 rounded accent-[#780115]" />
+                    <FaUserTie className="text-[#780115] text-sm" />
+                    <span className="text-xs text-gray-700">Alumni</span>
+                  </label>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={handleAddDocument} className="px-4 py-2 bg-[#7A0019] text-white text-xs font-medium rounded-lg hover:bg-[#5a0012] transition">Add</button>
@@ -358,8 +364,8 @@ const Settings = () => {
                   <tr className="border-b border-gray-200">
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Document Type</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Fee (₱)</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Days</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">For</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Processing Days</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500">Student/Alumni</th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-500">Action</th>
                   </tr>
                 </thead>
@@ -381,18 +387,19 @@ const Settings = () => {
                         <input type="number" min="1" max="30" value={doc.processing_days} onChange={(e) => handleDocumentSettingChange(doc.id, 'processing_days', parseInt(e.target.value))}
                           className="w-16 px-2 py-1 border border-gray-200 rounded text-sm text-center focus:ring-1 focus:ring-[#7A0019] outline-none" />
                       </td>
+                      {/* 🆕 CHECKBOX COLUMN */}
                       <td className="px-3 py-2">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => handleRoleToggle(doc.id, 'student')}
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium transition ${(doc.allowedRoles || []).includes('student') ? 'text-white' : 'bg-gray-200 text-gray-500'}`}
-                            style={(doc.allowedRoles || []).includes('student') ? { backgroundColor: '#285ccc' } : {}}>
-                            <FaUserGraduate className="inline mr-0.5" />S
-                          </button>
-                          <button onClick={() => handleRoleToggle(doc.id, 'alumni')}
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium transition ${(doc.allowedRoles || []).includes('alumni') ? 'text-white' : 'bg-gray-200 text-gray-500'}`}
-                            style={(doc.allowedRoles || []).includes('alumni') ? { backgroundColor: '#780115' } : {}}>
-                            <FaUserTie className="inline mr-0.5" />A
-                          </button>
+                        <div className="flex items-center justify-center gap-3">
+                          <label className="flex items-center gap-1 cursor-pointer" title="Student">
+                            <input type="checkbox" checked={(doc.allowedRoles || []).includes('student')} onChange={() => handleRoleToggle(doc.id, 'student')}
+                              className="w-4 h-4 rounded accent-[#285ccc]" />
+                            <FaUserGraduate className="text-[#285ccc] text-xs" />
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer" title="Alumni">
+                            <input type="checkbox" checked={(doc.allowedRoles || []).includes('alumni')} onChange={() => handleRoleToggle(doc.id, 'alumni')}
+                              className="w-4 h-4 rounded accent-[#780115]" />
+                            <FaUserTie className="text-[#780115] text-xs" />
+                          </label>
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center">
