@@ -10,6 +10,12 @@ import {
   FaBuilding
 } from 'react-icons/fa';
 
+const MSULogoFallback = () => (
+  <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#7A0019] to-[#0038A8] flex items-center justify-center shadow-md">
+    <span className="text-white font-bold text-xs">MSU</span>
+  </div>
+);
+
 const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
   const navigate = useNavigate();
   const [userInfo, setUserInfo] = useState({
@@ -22,6 +28,7 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
   
   const [pendingCount, setPendingCount] = useState(0);
   const [isLoadingCount, setIsLoadingCount] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -150,15 +157,17 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
         {/* ========== LOGO SECTION ========== */}
         <div className="relative p-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <img
-              src="/Msu-Tcto_Logo.jpg"
-              alt="Msu-Tcto_Logo"
-              className="h-10 w-10 rounded-lg object-cover"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://via.placeholder.com/40x40?text=MSU';
-              }}
-            />
+            {!logoError ? (
+              <img
+                src="/Msu-Tcto_Logo.jpg"
+                alt="Msu-Tcto_Logo"
+                className="h-10 w-10 rounded-lg object-cover shadow-md"
+                onError={() => setLogoError(true)}
+                loading="lazy"
+              />
+            ) : (
+              <MSULogoFallback />
+            )}
             <div>
               <h1 className="font-bold text-[#5F0231] text-lg">MSU-TCTO</h1>
               <p className="text-[10px] text-[#285ccc] uppercase tracking-wide">Queuing System with Notification</p>
