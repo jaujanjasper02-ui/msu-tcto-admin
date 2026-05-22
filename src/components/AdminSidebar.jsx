@@ -72,35 +72,57 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
     }
   }, []);
 
-  const fetchPendingCount = useCallback(async () => {
-    setIsLoadingCount(true);
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch(`${API_BASE_URL}/requests/pending-count`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPendingCount(data.count || 0);
-      }
-    } catch (err) {
-      console.error('Error fetching pending count:', err);
-    } finally {
-      setIsLoadingCount(false);
+ const fetchPendingCount = useCallback(async () => {
+  setIsLoadingCount(true);
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.warn('⚠️ No auth token found');
+      return;
     }
-  }, [API_BASE_URL]);
 
-  useEffect(() => {
-    fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 10000);
-    return () => clearInterval(interval);
-  }, [fetchPendingCount]);
+    // ✅ Use correct API URL - respects VITE_API_URL env variable
+    const apiUrl = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-nta0.onrender.com';
+    const requestUrl = `${apiUrl}/requests/pending-count`;
+    
+    console.log(`📡 Fetching pending count from: ${requestUrl}`);
+
+    const response = await fetch(requestUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error(`❌ API Error (${response.status}):`, errorData);
+      
+      if (response.status === 401) {
+        // Token expired, redirect to login
+        localStorage.removeItem('authToken');
+        window.location.href = '/login';
+      }
+      return;
+    }
+
+    const data = await response.json();
+    
+    // ✅ Handle both old and new response formats
+    const count = data.count !== undefined ? data.count : (data.data?.count || 0);
+    setPendingCount(count);
+    
+    console.log(`✅ Pending count updated: ${count}`);
+  } catch (err) {
+    console.error('❌ Error fetching pending count:', err);
+    setPendingCount(0); // Fallback to 0
+  } finally {
+    setIsLoadingCount(false);
+  }
+}, []);
 
   const getDepartmentDisplay = (dept) => {
     const deptNames = {
