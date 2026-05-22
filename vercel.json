@@ -1,12 +1,22 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "public": true,
   "env": {
     "VITE_API_URL": "https://msu-tcto-backend-nta0.onrender.com"
   },
   "headers": [
     {
       "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*\\.[a-zA-Z0-9]{1,}$)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -28,6 +38,10 @@
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
+    },
+    {
+      "src": "/Msu-Tcto_Logo\\.(jpg|jpeg|png)",
+      "dest": "/Msu-Tcto_Logo.$1"
     },
     {
       "src": "/(.*)",
