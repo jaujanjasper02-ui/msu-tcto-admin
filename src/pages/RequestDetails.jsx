@@ -41,10 +41,13 @@ const RequestDetails = () => {
   const [isRestricted, setIsRestricted] = useState(false);
   const [updating, setUpdating] = useState(false);
   
+  // 🆕 State to track if approved has been clicked
+  const [isApprovedOrProcessing, setIsApprovedOrProcessing] = useState(false);
+  
   // 🆕 Toast notification
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
 
-  const API_BASE_URL = 'https://msu-tcto-backend-nta0.onrender.com/api';
+  const API_BASE_URL = 'https://msu-tcto-backend-oh2j.onrender.com/api';
 
   const RESTRICTED_DOCUMENTS = [
     'Transcript of Records (TOR)', 'Diploma', 'CAV', 'Authentication',
@@ -76,6 +79,10 @@ const RequestDetails = () => {
 
         setRequest(data);
         setStatus(data.status);
+        
+        // 🆕 Check if status is approved, processing, ready, claimed, or rejected
+        const approvedOrProcessing = ['approved', 'processing', 'ready', 'claimed'].includes(data.status);
+        setIsApprovedOrProcessing(approvedOrProcessing);
         
         const restricted = data.studentType === 'Student' && 
                           RESTRICTED_DOCUMENTS.some(doc => data.documentType.includes(doc));
@@ -119,6 +126,11 @@ const RequestDetails = () => {
 
       setStatus(newStatus);
       
+      // 🆕 Update the approved/processing state based on new status
+      if (['approved', 'processing', 'ready', 'claimed'].includes(newStatus)) {
+        setIsApprovedOrProcessing(true);
+      }
+      
       const newHistory = {
         status: newStatus,
         timestamp: new Date().toISOString(),
@@ -157,7 +169,7 @@ const RequestDetails = () => {
   };
 
   const handleRejectClick = () => setShowRejectModal(true);
-  const handleClaimClick = () => setShowClaimModal(true);  // ✅ FIXED
+  const handleClaimClick = () => setShowClaimModal(true);
 
   const confirmReject = async () => {
     if (!rejectReason.trim()) {
@@ -245,9 +257,12 @@ const RequestDetails = () => {
 
   const currentStepIndex = statusSteps.findIndex(s => s.key === status);
 
+  // 🆕 Determine if Reject button should be disabled
+  const isRejectDisabled = isApprovedOrProcessing || status === 'claimed' || status === 'rejected' || updating;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 🆕 Toast Notification */}
+      {/* Toast Notification */}
       {toast.show && (
         <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-slide-in text-white text-sm font-medium ${
           toast.type === 'success' ? 'bg-emerald-500' : 
@@ -342,8 +357,11 @@ const RequestDetails = () => {
                 <p className="text-sm text-red-700 mt-1">
                   <strong>{request.documentType}</strong> is not available for <strong>{request.studentType}</strong>. Only Alumni can request this document.
                 </p>
-                <button onClick={handleRejectClick} disabled={updating}
-                  className="mt-3 px-4 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition">
+                <button 
+                  onClick={handleRejectClick} 
+                  disabled={isRejectDisabled || updating}
+                  className="mt-3 px-4 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Reject Request
                 </button>
               </div>
@@ -404,20 +422,52 @@ const RequestDetails = () => {
                 <div className="p-4 space-y-2.5">
                   {!isRestricted && (
                     <>
-                      <ActionButton step={1} color="blue" label="Approved & Processing" desc="Approve request & start processing"
-                        disabled={status !== 'pending' || updating} onClick={() => handleStatusChange('approved')} />
-                      <ActionButton step={2} color="purple" label="Ready for Pickup" desc="Document is ready to be claimed"
-                        disabled={!['processing','approved'].includes(status) || updating} onClick={() => handleStatusChange('ready')} />
-                      <ActionButton step={3} color="green" label="Mark as Claimed" desc="Document claimed (no notification sent)"
-                        disabled={status !== 'ready' || updating} onClick={handleClaimClick} />
+                      <ActionButton 
+                        step={1} 
+                        color="blue" 
+                        label="Approved & Processing" 
+                        desc="Approve request & start processing"
+                        disabled={status !== 'pending' || updating} 
+                        onClick={() => handleStatusChange('approved')} 
+                      />
+                      <ActionButton 
+                        step={2} 
+                        color="purple" 
+                        label="Ready for Pickup" 
+                        desc="Document is ready to be claimed"
+                        disabled={!['processing','approved'].includes(status) || updating} 
+                        onClick={() => handleStatusChange('ready')} 
+                      />
+                      <ActionButton 
+                        step={3} 
+                        color="green" 
+                        label="Mark as Claimed" 
+                        desc="Document claimed (no notification sent)"
+                        disabled={status !== 'ready' || updating} 
+                        onClick={handleClaimClick} 
+                      />
                     </>
                   )}
                   <div className="relative py-1">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
                     <div className="relative flex justify-center"><span className="bg-white px-2 text-xs text-gray-400">or</span></div>
                   </div>
-                  <ActionButton step="✕" color="red" label="Reject Request" desc="Decline this request with reason"
-                    disabled={['claimed','rejected'].includes(status) || updating} onClick={handleRejectClick} />
+                  {/* 🆕 Reject button - disabled once approved/processing */}
+                  <ActionButton 
+                    step="✕" 
+                    color="red" 
+                    label="Reject Request" 
+                    desc={isApprovedOrProcessing ? "Cannot reject after approval" : "Decline this request with reason"}
+                    disabled={isRejectDisabled} 
+                    onClick={handleRejectClick} 
+                  />
+                  {/* 🆕 Show warning message when reject is disabled due to approval */}
+                  {isApprovedOrProcessing && status !== 'claimed' && status !== 'rejected' && (
+                    <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                      <FaInfoCircle className="text-amber-500 text-xs" />
+                      <p className="text-xs text-amber-700">Reject is disabled because this request has already been approved/processed.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -539,7 +589,7 @@ const RequestDetails = () => {
   );
 };
 
-// 🆕 Helper Components
+// Helper Components
 const InfoItem = ({ icon, label, value, isEmail, highlight }) => (
   <div className="flex items-start gap-3">
     <div className={`mt-0.5 ${highlight ? 'text-[#7A0019]' : 'text-gray-400'}`}>{icon}</div>
@@ -564,7 +614,7 @@ const ActionButton = ({ step, color, label, desc, disabled, onClick }) => {
   return (
     <button onClick={onClick} disabled={disabled}
       className={`w-full flex items-center px-4 py-3 rounded-xl text-sm transition border ${disabled ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : colors[color]}`}>
-      <span className={`w-7 h-7 ${bgColors[color]} rounded-full flex items-center justify-center mr-3 text-white text-xs font-bold flex-shrink-0`}>
+      <span className={`w-7 h-7 ${bgColors[color]} rounded-full flex items-center justify-center mr-3 text-white text-xs font-bold flex-shrink-0 ${disabled ? 'opacity-50' : ''}`}>
         {step}
       </span>
       <div className="flex-1 text-left">

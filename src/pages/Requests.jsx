@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   FaSearch, 
   FaTimes, 
-  FaEye, 
   FaChevronLeft, 
   FaChevronRight,
   FaRegClock,
@@ -18,7 +17,9 @@ import {
   FaTimes as FaTimesIcon,
   FaLock,
   FaCalendarDay,
-  FaExclamationCircle
+  FaExclamationCircle,
+  FaRegFileAlt,
+  FaSearchPlus
 } from 'react-icons/fa';
 
 // ============================================
@@ -39,6 +40,40 @@ const StatusBadge = ({ status }) => {
       {c.icon}
       {c.label}
     </span>
+  );
+};
+
+// ============================================
+// CUSTOM VIEW DETAILS ICON COMPONENT
+// ============================================
+const ViewDetailsIcon = ({ className = "w-4 h-4" }) => {
+  return (
+    <svg 
+      className={className} 
+      fill="none" 
+      stroke="currentColor" 
+      viewBox="0 0 24 24" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        strokeWidth={2} 
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
+      />
+      <path 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        strokeWidth={2} 
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" 
+      />
+      <path 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        strokeWidth={2} 
+        d="M17.5 17.5L21 21" 
+      />
+    </svg>
   );
 };
 
@@ -84,6 +119,8 @@ const getLocalDateString = (date) => {
 // MAIN REQUESTS COMPONENT
 // ============================================
 const Requests = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [requests, setRequests] = useState([]);
@@ -105,7 +142,7 @@ const Requests = () => {
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [dailyLimit, setDailyLimit] = useState(100);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-nta0.onrender.com/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-oh2j.onrender.com/api';
 
   // Local today and yesterday
   const todayLocal = useMemo(() => getLocalDateString(new Date()), []);
@@ -114,6 +151,31 @@ const Requests = () => {
     yesterday.setDate(yesterday.getDate() - 1);
     return getLocalDateString(yesterday);
   }, []);
+
+  // 🆕 READ URL PARAMETERS (from Dashboard clicks)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get('status');
+    const searchParam = params.get('search');
+    const dateParam = params.get('date');
+    
+    if (statusParam && ['pending', 'processing', 'ready', 'claimed', 'rejected'].includes(statusParam)) {
+      setFilter(statusParam);
+      // Clear search term when filtering by status
+      if (searchTerm) setSearchTerm('');
+    }
+    
+    if (searchParam) {
+      setSearchTerm(searchParam);
+      // Clear filter when searching
+      if (filter !== 'all') setFilter('all');
+    }
+    
+    if (dateParam) {
+      // Optional: handle date filtering
+      console.log('Date filter:', dateParam);
+    }
+  }, [location.search]);
 
   // Load user and daily limit
   useEffect(() => {
@@ -314,6 +376,15 @@ const Requests = () => {
     setFilter(newFilter);
     setPagination(prev => ({ ...prev, page: 1 }));
     if (isSearching) { setSearchTerm(''); setIsSearching(false); }
+    // Update URL without reloading the page
+    navigate(`/admin/requests?status=${newFilter === 'all' ? '' : newFilter}`, { replace: true });
+  };
+
+  // Handle row click to navigate to details
+  const handleRowClick = (requestId, isBlocked) => {
+    if (!isBlocked) {
+      navigate(`/admin/requests/${requestId}`);
+    }
   };
 
   // Format display date using LOCAL dates
@@ -375,15 +446,6 @@ const Requests = () => {
             Refresh
           </button>
         </div>
-
-        {/* Department Banner */}
-        {currentUser.role !== 'super_admin' && (
-          <div className="mb-5 bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-700">
-              📁 You are managing: <strong>{getDepartmentDisplay(currentUser.department)}</strong> Department
-            </p>
-          </div>
-        )}
 
         {/* Now Serving & Queue Info */}
         <div className="mb-5 bg-amber-50 rounded-lg p-3 border border-amber-200">
@@ -465,7 +527,7 @@ const Requests = () => {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Date</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Actions</th>
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 {processedRequests.length === 0 ? (
@@ -486,7 +548,15 @@ const Requests = () => {
                     const isOldDate = request.displayDate < todayLocal && ['pending','approved','processing'].includes(request.status);
                     
                     return (
-                      <tr key={request.id} className={`border-b border-gray-100 hover:bg-gray-50 ${restricted ? 'bg-rose-50/30' : ''}`}>
+                      <tr 
+                        key={request.id} 
+                        className={`border-b border-gray-100 transition-colors ${
+                          !isBlocked 
+                            ? 'cursor-pointer hover:bg-blue-50' 
+                            : 'cursor-not-allowed hover:bg-gray-50'
+                        } ${restricted ? 'bg-rose-50/30' : ''}`}
+                        onClick={() => handleRowClick(request.id, isBlocked)}
+                      >
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
                             <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold ${
@@ -534,15 +604,12 @@ const Requests = () => {
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={request.status} /></td>
                         <td className="px-4 py-3 text-center">
-                          {/* Kung naka-lock, walang actions. Kung hindi, eye icon lang. */}
+                          {/* View button - still here for clarity, but row click also works */}
                           {!isBlocked && (
-                            <Link 
-                              to={`/admin/requests/${request.id}`} 
-                              className="inline-flex items-center justify-center p-2 text-gray-400 hover:text-[#7A0019] hover:bg-gray-100 rounded-lg transition"
-                              title="View Details"
-                            >
-                              <FaEye className="w-4 h-4" />
-                            </Link>
+                            <div className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 bg-blue-50 text-blue-600 rounded-lg transition group">
+                              <ViewDetailsIcon className="w-4 h-4" />
+                              <span className="text-xs font-medium hidden sm:inline">View</span>
+                            </div>
                           )}
                         </td>
                       </tr>

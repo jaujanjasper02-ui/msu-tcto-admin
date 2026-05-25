@@ -20,49 +20,14 @@ const AdminUsers = () => {
 
   const [newUser, setNewUser] = useState({
     name: '',
-    email: '',
-    department: 'CCS'
+    email: ''
   });
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-nta0.onrender.com/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-oh2j.onrender.com/api';
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
-  };
-
-  const departments = [
-    { code: 'CCS', name: 'College of Computer Studies (CCS)' },
-    { code: 'COED', name: 'College of Education (COED)' },
-    { code: 'CAS', name: 'College of Arts and Sciences (CAS)' },
-    { code: 'COF', name: 'College of Fisheries (COF)' },
-    { code: 'CIAS', name: 'College of Islamic and Arabic Studies (CIAS)' },
-    { code: 'IOES', name: 'Institute of Oceanography (IOES)' },
-    { code: 'ALL', name: 'ALL DEPARTMENTS (Registrar)' }
-  ];
-
-  const getDepartmentDisplay = (department) => {
-    const dept = departments.find(d => d.code === department);
-    return dept ? dept.name : department;
-  };
-
-  const getDepartmentBadge = (department) => {
-    if (department === 'ALL') {
-      return <span className="px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700">📋 All Departments</span>;
-    }
-    const colors = {
-      'CCS': 'bg-blue-100 text-blue-700',
-      'COED': 'bg-green-100 text-green-700',
-      'CAS': 'bg-yellow-100 text-yellow-700',
-      'COF': 'bg-cyan-100 text-cyan-700',
-      'CIAS': 'bg-emerald-100 text-emerald-700',
-      'IOES': 'bg-teal-100 text-teal-700'
-    };
-    return (
-      <span className={`px-2 py-1 rounded-md text-xs font-medium ${colors[department] || 'bg-gray-100 text-gray-700'}`}>
-        📁 {department}
-      </span>
-    );
   };
 
   useEffect(() => {
@@ -73,6 +38,7 @@ const AdminUsers = () => {
         const user = parsed.user || parsed;
         const role = user.role || 'staff';
         
+        // Only super_admin can access this page
         if (role !== 'super_admin') {
           navigate('/admin/dashboard');
         } else {
@@ -88,7 +54,6 @@ const AdminUsers = () => {
     }
   }, [navigate]);
 
-  // ✅ UPDATED: fetch users from /api/admin/users (not /admin-users)
   const fetchAdminUsers = async () => {
     setFetchLoading(true);
     try {
@@ -112,8 +77,7 @@ const AdminUsers = () => {
   const filteredUsers = adminUsers.filter(user => {
     if (!searchTerm) return true;
     return user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           user.department?.toLowerCase().includes(searchTerm.toLowerCase());
+           user.email?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   const stats = [
@@ -138,8 +102,8 @@ const AdminUsers = () => {
       )
     },
     {
-      title: 'Registrar',
-      value: adminUsers.filter(u => u.role === 'super_admin').length.toString(),
+      title: 'Total Admins',
+      value: adminUsers.length.toString(),
       color: 'gold',
       icon: (
         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,7 +113,6 @@ const AdminUsers = () => {
     }
   ];
 
-  // ✅ UPDATED: POST to /api/admin/users
   const handleAddUser = async () => {
     if (!newUser.name || !newUser.email) {
       showToast('Please fill in all required fields', 'error');
@@ -172,7 +135,7 @@ const AdminUsers = () => {
         },
         body: JSON.stringify({ 
           ...newUser, 
-          role: 'staff'
+          role: 'admin'  // 👈 CHANGED: from 'staff' to 'admin'
         })
       });
 
@@ -181,7 +144,7 @@ const AdminUsers = () => {
 
       showToast(`Staff member added successfully! Invitation email sent to ${newUser.email}`, 'success');
       setShowAddModal(false);
-      setNewUser({ name: '', email: '', department: 'CCS' });
+      setNewUser({ name: '', email: '' });
       fetchAdminUsers();
     } catch (error) {
       showToast(error.message, 'error');
@@ -190,7 +153,6 @@ const AdminUsers = () => {
     }
   };
 
-  // ✅ UPDATED: PUT to /api/admin/users/:id
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
     setLoading(true);
@@ -206,8 +168,8 @@ const AdminUsers = () => {
           name: selectedUser.name,
           email: selectedUser.email,
           status: selectedUser.status,
-          role: selectedUser.role,
-          department: selectedUser.department
+          role: selectedUser.role
+          // 👈 REMOVED: department field
         })
       });
 
@@ -225,7 +187,6 @@ const AdminUsers = () => {
     }
   };
 
-  // ✅ UPDATED: DELETE to /api/admin/users/:id
   const handleDeleteUser = async () => {
     setLoading(true);
     try {
@@ -249,7 +210,6 @@ const AdminUsers = () => {
     }
   };
 
-  // ✅ UPDATED: POST reset-password to /api/admin/users/:id/reset-password
   const handleResetPassword = async (user) => {
     if (!window.confirm(`Send password reset email to ${user.name}?`)) return;
     
@@ -277,7 +237,7 @@ const AdminUsers = () => {
     if (user.role === 'super_admin') {
       return <span className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700">👑 Registrar</span>;
     }
-    return <span className="px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700">Staff</span>;
+    return <span className="px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700">Admin Staff</span>;
   };
 
   const getStatusBadge = (status) => {
@@ -298,11 +258,6 @@ const AdminUsers = () => {
           <div className="text-xs text-gray-400">{item.email}</div>
         </div>
       )
-    },
-    {
-      key: 'department',
-      header: 'Department',
-      render: (item) => getDepartmentBadge(item.department)
     },
     {
       key: 'role',
@@ -381,7 +336,7 @@ const AdminUsers = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#5F0231]">Registrar Office Staff</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage staff members and their department assignments</p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage staff members</p>
         </div>
         
         <button
@@ -410,7 +365,7 @@ const AdminUsers = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name, email, or department..."
+            placeholder="Search by name or email..."
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#7A0019] focus:border-[#7A0019]"
           />
         </div>
@@ -428,11 +383,11 @@ const AdminUsers = () => {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-            <span className="text-sm text-gray-600"><strong className="text-red-700">Registrar</strong> - Full access, can manage staff accounts, sees ALL departments</span>
+            <span className="text-sm text-gray-600"><strong className="text-red-700">Registrar (Super Admin)</strong> - Full access, can add/edit/delete staff accounts</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-            <span className="text-sm text-gray-600"><strong className="text-blue-700">Department Staff</strong> - Can ONLY see and process requests from their assigned department</span>
+            <span className="text-sm text-gray-600"><strong className="text-blue-700">Admin Staff</strong> - Can process ALL document requests (no department restrictions)</span>
           </div>
         </div>
       </div>
@@ -461,27 +416,8 @@ const AdminUsers = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Email Address <span className="text-red-500">*</span></label>
             <input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#7A0019] outline-none" placeholder="Enter email address" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Department <span className="text-red-500">*</span></label>
-            <select
-              value={newUser.department}
-              onChange={(e) => setNewUser({...newUser, department: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#7A0019] outline-none"
-            >
-              {departments.map(dept => (
-                <option key={dept.code} value={dept.code}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              {newUser.department === 'ALL' 
-                ? '⚠️ This staff will have FULL ACCESS to all departments (Registrar level)' 
-                : 'This staff will ONLY see and process requests from this department'}
-            </p>
-          </div>
           <div className="bg-blue-50 p-3 rounded-lg">
-            <p className="text-xs text-blue-700">An invitation email will be sent with login credentials.</p>
+            <p className="text-xs text-blue-700">An invitation email will be sent with login credentials. All staff members can process ALL document requests.</p>
           </div>
         </div>
       </Modal>
@@ -512,21 +448,6 @@ const AdminUsers = () => {
               <input type="email" value={selectedUser.email} onChange={(e) => setSelectedUser({...selectedUser, email: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#7A0019] outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Department</label>
-              <select
-                value={selectedUser.department}
-                onChange={(e) => setSelectedUser({...selectedUser, department: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#7A0019] outline-none"
-                disabled={selectedUser.role === 'super_admin' && selectedUser.department === 'ALL'}
-              >
-                {departments.map(dept => (
-                  <option key={dept.code} value={dept.code}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select value={selectedUser.status} onChange={(e) => setSelectedUser({...selectedUser, status: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#7A0019] outline-none">
                 <option value="active">Active</option>
@@ -534,12 +455,8 @@ const AdminUsers = () => {
               </select>
             </div>
             <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-600"><strong>Role:</strong> {selectedUser.role === 'super_admin' ? 'Registrar' : 'Staff'}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {selectedUser.department === 'ALL' 
-                  ? 'This staff has access to ALL departments' 
-                  : `This staff can only process requests from ${selectedUser.department} department`}
-              </p>
+              <p className="text-xs text-gray-600"><strong>Role:</strong> {selectedUser.role === 'super_admin' ? 'Registrar' : 'Admin Staff'}</p>
+              <p className="text-xs text-gray-500 mt-1">This staff has FULL ACCESS to ALL document requests.</p>
             </div>
           </div>
         )}

@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { 
   FaTachometerAlt, 
   FaFileAlt, 
   FaHistory, 
   FaCog, 
   FaUsersCog,
-  FaSignOutAlt,
-  FaBuilding
+  FaSignOutAlt
 } from 'react-icons/fa';
 
 const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
@@ -16,14 +15,13 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
     name: 'Admin User',
     email: 'admin@msutcto.edu.ph',
     initials: 'AD',
-    role: 'staff',
-    department: 'CCS'
+    role: 'staff'
   });
   
   const [pendingCount, setPendingCount] = useState(0);
   const [isLoadingCount, setIsLoadingCount] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-oh2j.onrender.com/api';
 
   useEffect(() => {
     const userData = localStorage.getItem('currentUser');
@@ -43,7 +41,6 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
         
         const email = user.email || 'admin@msutcto.edu.ph';
         const role = user.role || 'staff';
-        const department = user.department || 'CCS';
         
         const initials = displayName
           .split(' ')
@@ -56,8 +53,7 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
           name: displayName,
           email: email,
           initials: initials,
-          role: role,
-          department: department
+          role: role
         });
       } catch (error) {
         console.error('Error parsing user data:', error);
@@ -94,19 +90,6 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
     const interval = setInterval(fetchPendingCount, 10000);
     return () => clearInterval(interval);
   }, [fetchPendingCount]);
-
-  const getDepartmentDisplay = (dept) => {
-    const deptNames = {
-      'CCS': 'College of Computer Studies',
-      'COED': 'College of Education',
-      'CAS': 'College of Arts and Sciences',
-      'COF': 'College of Fisheries',
-      'CIAS': 'College of Islamic and Arabic Studies',
-      'IOES': 'Institute of Oceanography',
-      'ALL': 'All Departments'
-    };
-    return deptNames[dept] || dept;
-  };
 
   const baseNavItems = [
     { path: '/admin/dashboard', icon: <FaTachometerAlt className="w-5 h-5" />, label: 'Dashboard', description: 'Overview & analytics' },
@@ -147,12 +130,16 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
           lg:shadow-xl
         `}
       >
-        {/* ========== LOGO SECTION ========== */}
-        <div className="relative p-5 border-b border-gray-100">
+        {/* ========== 🆕 CLICKABLE LOGO SECTION ========== */}
+        <Link 
+          to="/admin/dashboard" 
+          onClick={closeSidebar}
+          className="relative p-5 border-b border-gray-100 hover:bg-gray-50/50 transition cursor-pointer block"
+        >
           <div className="flex items-center gap-3">
             <img
               src="/Msu-Tcto_Logo.jpg"
-              alt="Msu-Tcto_Logo"
+              alt="MSU-TCTO Logo"
               className="h-10 w-10 rounded-lg object-cover"
               onError={(e) => {
                 e.target.onerror = null;
@@ -166,14 +153,18 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
           </div>
           
           <button
-            onClick={closeSidebar}
+            onClick={(e) => {
+              e.preventDefault(); // 🆕 Iwasan ang Link navigation kapag close button ang na-click
+              e.stopPropagation();
+              closeSidebar();
+            }}
             className="absolute top-5 right-4 p-1 lg:hidden text-gray-400 hover:text-[#7A0019] rounded-lg hover:bg-gray-100 transition"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
+        </Link>
 
         {/* ========== USER PROFILE SECTION ========== */}
         <div className="m-4 p-3 bg-gradient-to-r from-[#7A0019]/5 via-white to-[#0038A8]/5 rounded-xl border border-gray-100 shadow-sm">
@@ -192,15 +183,9 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
                 <span className={`text-[10px] font-semibold ${
                   userInfo.role === 'super_admin' ? 'text-red-600' : 'text-blue-600'
                 }`}>
-                  {userInfo.role === 'super_admin' ? 'Registrar' : 'Staff'}
+                  {userInfo.role === 'super_admin' ? 'Registrar' : 'Admin Staff'}
                 </span>
               </div>
-              {userInfo.role !== 'super_admin' && (
-                <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500">
-                  <FaBuilding className="w-2.5 h-2.5" />
-                  <span>Managing: {getDepartmentDisplay(userInfo.department)}</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -258,7 +243,7 @@ const AdminSidebar = ({ isOpen, closeSidebar, toggleSidebar }) => {
           </button>
           
           <p className="text-[9px] text-center text-gray-300 mt-3">
-            © 2026 MSU-TCTO Registrar
+            © 2026 MSU-TCTO Registrar System
           </p>
         </div>
       </aside>

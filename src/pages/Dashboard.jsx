@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FaSpinner, FaFileAlt, FaClock, FaCheckCircle, FaTimesCircle,
   FaUsers, FaFileSignature, FaExclamationTriangle,
   FaUserGraduate, FaUserTie, FaSync,
-  FaUniversity, FaIdCard, FaGraduationCap,
-  FaCalendarWeek, FaCalendarDay, FaBook,
-  FaRegClock, FaArrowRight, FaChartLine
+  FaUniversity, FaIdCard, FaBook, FaChartLine
 } from 'react-icons/fa';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-nta0.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://msu-tcto-backend-oh2j.onrender.com/api';
 
 const DEFAULT_ACTIVITY = {
   weekly: [0, 0, 0, 0, 0, 0, 0],
@@ -21,7 +19,7 @@ const DEFAULT_ACTIVITY = {
 };
 
 // ============================================
-// STAT CARD COMPONENT (Simplified)
+// STAT CARD COMPONENT
 // ============================================
 const StatCard = ({ title, value, color, icon: Icon, onClick }) => (
   <div 
@@ -39,34 +37,26 @@ const StatCard = ({ title, value, color, icon: Icon, onClick }) => (
 );
 
 // ============================================
-// PROGRESS BAR COMPONENT (Simplified)
+// PROGRESS BAR COMPONENT
 // ============================================
 const ProgressBar = ({ label, value, percentage, color, onClick }) => {
   const safePercent = Math.min(Math.max(percentage || 0, 0), 100);
   
   return (
-    <div 
-      className="mb-3 cursor-pointer hover:opacity-80 transition"
-      onClick={onClick}
-    >
+    <div className="mb-3 cursor-pointer hover:opacity-80 transition" onClick={onClick}>
       <div className="flex justify-between items-center mb-1">
-        <span className="text-xs font-medium text-gray-700 truncate flex-1" title={label}>
-          {label}
-        </span>
+        <span className="text-xs font-medium text-gray-700 truncate flex-1" title={label}>{label}</span>
         <span className="text-xs font-semibold text-gray-900 ml-2">{value}</span>
       </div>
       <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-        <div 
-          className={`h-full rounded-full ${color} transition-all duration-500`}
-          style={{ width: `${safePercent}%` }}
-        ></div>
+        <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${safePercent}%` }}></div>
       </div>
     </div>
   );
 };
 
 // ============================================
-// ACTIVITY CHART COMPONENT (Simplified)
+// ACTIVITY CHART COMPONENT
 // ============================================
 const ActivityChart = ({ data, labels, type, onBarClick, isLoading = false }) => {
   const maxValue = Math.max(...data, 1);
@@ -92,12 +82,9 @@ const ActivityChart = ({ data, labels, type, onBarClick, isLoading = false }) =>
   return (
     <div className="bg-white rounded-xl p-4 border border-gray-100">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-700">
-          {type === 'weekly' ? 'Weekly Activity' : 'Monthly Activity'}
-        </h3>
+        <h3 className="text-sm font-semibold text-gray-700">{type === 'weekly' ? 'Weekly Activity' : 'Monthly Activity'}</h3>
         <span className="text-xs text-gray-400">Total: {data.reduce((a, b) => a + b, 0)}</span>
       </div>
-      
       <div className="h-40 flex items-end justify-between gap-1">
         {data.map((value, idx) => {
           const height = maxValue > 0 ? (value / maxValue) * 100 : 0;
@@ -118,28 +105,18 @@ const ActivityChart = ({ data, labels, type, onBarClick, isLoading = false }) =>
 };
 
 // ============================================
-// MAIN DASHBOARD COMPONENT (Simplified)
+// MAIN DASHBOARD COMPONENT
 // ============================================
 const Dashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [activityType, setActivityType] = useState('weekly');
   const [dashboardData, setDashboardData] = useState({
-    total: 0,
-    pending: 0,
-    processing: 0,
-    ready: 0,
-    claimed: 0,
-    rejected: 0,
-    documentDistribution: [],
-    departmentDistribution: [],
-    courseDistribution: [],
-    yearLevelDistribution: [],
-    userTypeDistribution: [],
-    activityData: DEFAULT_ACTIVITY
+    total: 0, pending: 0, processing: 0, ready: 0, claimed: 0, rejected: 0,
+    documentDistribution: [], departmentDistribution: [], courseDistribution: [],
+    yearLevelDistribution: [], userTypeDistribution: [], activityData: DEFAULT_ACTIVITY
   });
 
   const fetchDashboardStats = useCallback(async () => {
@@ -148,11 +125,7 @@ const Dashboard = () => {
     
     try {
       const token = localStorage.getItem('authToken');
-      if (!token) {
-        setError('Not authenticated');
-        setLoading(false);
-        return;
-      }
+      if (!token) { setError('Not authenticated'); setLoading(false); return; }
 
       const response = await fetch(`${API_BASE_URL}/requests/dashboard-stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -175,7 +148,6 @@ const Dashboard = () => {
         userTypeDistribution: data.userTypeDistribution || [],
         activityData: data.activityData || DEFAULT_ACTIVITY
       });
-      setLastUpdated(new Date());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -184,12 +156,17 @@ const Dashboard = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchDashboardStats();
-  }, [fetchDashboardStats]);
+  useEffect(() => { fetchDashboardStats(); }, [fetchDashboardStats]);
 
+  // 🆕 UPDATED: Navigate to requests page with status filter
   const handleStatCardClick = (status) => {
-    navigate(status === 'total' ? '/admin/requests' : `/admin/requests?status=${status}`);
+    if (status === 'total') {
+      navigate('/admin/requests');
+    } else {
+      // Navigate to requests page with the status as URL parameter
+      // The Requests page will read this parameter and set the filter automatically
+      navigate(`/admin/requests?status=${status}`);
+    }
   };
 
   const handleProgressBarClick = (type, name) => {
@@ -213,9 +190,7 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl p-6 text-center max-w-md">
           <FaExclamationTriangle className="text-red-500 text-3xl mx-auto mb-3" />
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchDashboardStats} className="px-4 py-2 bg-[#7A0019] text-white rounded-lg text-sm">
-            Try Again
-          </button>
+          <button onClick={fetchDashboardStats} className="px-4 py-2 bg-[#7A0019] text-white rounded-lg text-sm">Try Again</button>
         </div>
       </div>
     );
@@ -229,36 +204,23 @@ const Dashboard = () => {
       <div className="max-w-[1400px] mx-auto px-4 py-6">
         
         {/* ========== HEADER ========== */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-[#5F0231]">Dashboard</h1>
             <p className="text-sm text-gray-500 mt-0.5">Overview of document requests</p>
           </div>
           
-          <div className="flex items-center gap-3">
-            {lastUpdated && (
-              <span className="text-xs text-gray-400">
-                Updated {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
-            <button 
-              onClick={() => fetchDashboardStats()}
-              disabled={refreshing}
-              className="p-2 bg-white rounded-lg text-gray-500 hover:text-[#7A0019] border border-gray-200"
-            >
-              <FaSync className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <Link 
-              to="/admin/requests" 
-              className="px-4 py-2 bg-[#7A0019] text-white text-sm font-medium rounded-lg hover:bg-[#5a0012] transition flex items-center gap-2"
-            >
-              View Requests
-              <FaArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
+          <button 
+            onClick={() => { setRefreshing(true); fetchDashboardStats(); }}
+            disabled={refreshing}
+            className="p-2 bg-white rounded-lg text-gray-500 hover:text-[#7A0019] border border-gray-200"
+            title="Refresh dashboard"
+          >
+            <FaSync className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
-        {/* ========== STATS CARDS ========== */}
+        {/* ========== STATS CARDS - Clickable to Requests page with filter ========== */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           <StatCard title="Total" value={dashboardData.total} color="bg-blue-500" icon={FaFileAlt} onClick={() => handleStatCardClick('total')} />
           <StatCard title="Pending" value={dashboardData.pending} color="bg-amber-500" icon={FaClock} onClick={() => handleStatCardClick('pending')} />
@@ -273,162 +235,72 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-700">Activity Overview</h2>
             <div className="flex gap-2">
-              <button
-                onClick={() => setActivityType('weekly')}
-                className={`px-3 py-1 text-xs rounded-lg transition ${activityType === 'weekly' ? 'bg-[#7A0019] text-white' : 'bg-white text-gray-600 border'}`}
-              >
-                Weekly
-              </button>
-              <button
-                onClick={() => setActivityType('monthly')}
-                className={`px-3 py-1 text-xs rounded-lg transition ${activityType === 'monthly' ? 'bg-[#7A0019] text-white' : 'bg-white text-gray-600 border'}`}
-              >
-                Monthly
-              </button>
+              <button onClick={() => setActivityType('weekly')} className={`px-3 py-1 text-xs rounded-lg transition ${activityType === 'weekly' ? 'bg-[#7A0019] text-white' : 'bg-white text-gray-600 border'}`}>Weekly</button>
+              <button onClick={() => setActivityType('monthly')} className={`px-3 py-1 text-xs rounded-lg transition ${activityType === 'monthly' ? 'bg-[#7A0019] text-white' : 'bg-white text-gray-600 border'}`}>Monthly</button>
             </div>
           </div>
-          <ActivityChart 
-            data={currentActivity}
-            labels={currentLabels}
-            type={activityType}
-            onBarClick={(label) => navigate(`/admin/requests?date=${label}`)}
-          />
+          <ActivityChart data={currentActivity} labels={currentLabels} type={activityType} onBarClick={(label) => navigate(`/admin/requests?date=${label}`)} />
         </div>
 
         {/* ========== DISTRIBUTION GRID ========== */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
-          
-          {/* Documents Card */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FaFileSignature className="text-[#7A0019] text-sm" />
-              <h3 className="font-semibold text-gray-800 text-sm">Document Requests</h3>
-            </div>
+            <div className="flex items-center gap-2 mb-3"><FaFileSignature className="text-[#7A0019] text-sm" /><h3 className="font-semibold text-gray-800 text-sm">Document Requests</h3></div>
             <div className="max-h-64 overflow-y-auto">
               {dashboardData.documentDistribution.length > 0 ? (
                 dashboardData.documentDistribution.slice(0, 6).map((doc, idx) => (
-                  <ProgressBar 
-                    key={idx}
-                    label={doc.name}
-                    value={doc.count}
-                    percentage={Number(doc.percentage)}
-                    color="bg-gradient-to-r from-[#7A0019] to-[#0038A8]"
-                    onClick={() => handleProgressBarClick('document', doc.name)}
-                  />
+                  <ProgressBar key={idx} label={doc.name} value={doc.count} percentage={Number(doc.percentage)} color="bg-gradient-to-r from-[#7A0019] to-[#0038A8]" onClick={() => handleProgressBarClick('document', doc.name)} />
                 ))
-              ) : (
-                <p className="text-gray-400 text-sm text-center py-6">No data</p>
-              )}
+              ) : <p className="text-gray-400 text-sm text-center py-6">No data</p>}
             </div>
           </div>
-
-          {/* Courses Card */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FaBook className="text-green-600 text-sm" />
-              <h3 className="font-semibold text-gray-800 text-sm">Course Distribution</h3>
-            </div>
+            <div className="flex items-center gap-2 mb-3"><FaBook className="text-green-600 text-sm" /><h3 className="font-semibold text-gray-800 text-sm">Course Distribution</h3></div>
             <div className="max-h-64 overflow-y-auto">
               {dashboardData.courseDistribution.length > 0 ? (
                 dashboardData.courseDistribution.slice(0, 6).map((course, idx) => (
-                  <ProgressBar 
-                    key={idx}
-                    label={course.name}
-                    value={course.count}
-                    percentage={Number(course.percentage)}
-                    color="bg-gradient-to-r from-green-500 to-emerald-600"
-                    onClick={() => handleProgressBarClick('course', course.name)}
-                  />
+                  <ProgressBar key={idx} label={course.name} value={course.count} percentage={Number(course.percentage)} color="bg-gradient-to-r from-green-500 to-emerald-600" onClick={() => handleProgressBarClick('course', course.name)} />
                 ))
-              ) : (
-                <p className="text-gray-400 text-sm text-center py-6">No data</p>
-              )}
+              ) : <p className="text-gray-400 text-sm text-center py-6">No data</p>}
             </div>
           </div>
-
-          {/* Departments Card */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FaUniversity className="text-blue-600 text-sm" />
-              <h3 className="font-semibold text-gray-800 text-sm">Departments</h3>
-            </div>
+            <div className="flex items-center gap-2 mb-3"><FaUniversity className="text-blue-600 text-sm" /><h3 className="font-semibold text-gray-800 text-sm">Departments</h3></div>
             <div className="max-h-64 overflow-y-auto">
               {dashboardData.departmentDistribution.length > 0 ? (
                 dashboardData.departmentDistribution.slice(0, 6).map((dept, idx) => (
-                  <ProgressBar 
-                    key={idx}
-                    label={dept.name}
-                    value={dept.count}
-                    percentage={Number(dept.percentage)}
-                    color="bg-gradient-to-r from-blue-500 to-blue-600"
-                    onClick={() => handleProgressBarClick('department', dept.name)}
-                  />
+                  <ProgressBar key={idx} label={dept.name} value={dept.count} percentage={Number(dept.percentage)} color="bg-gradient-to-r from-blue-500 to-blue-600" onClick={() => handleProgressBarClick('department', dept.name)} />
                 ))
-              ) : (
-                <p className="text-gray-400 text-sm text-center py-6">No data</p>
-              )}
+              ) : <p className="text-gray-400 text-sm text-center py-6">No data</p>}
             </div>
           </div>
         </div>
 
         {/* ========== SECONDARY INSIGHTS ========== */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          
-          {/* User Distribution */}
           <div className="bg-gray-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FaUsers className="text-white/70 text-sm" />
-              <h3 className="font-semibold text-white text-sm">User Distribution</h3>
-            </div>
+            <div className="flex items-center gap-2 mb-3"><FaUsers className="text-white/70 text-sm" /><h3 className="font-semibold text-white text-sm">User Distribution</h3></div>
             <div className="space-y-3">
               {dashboardData.userTypeDistribution.length > 0 ? (
                 dashboardData.userTypeDistribution.map((item, idx) => {
                   const Icon = item.type === 'Student' ? FaUserGraduate : FaUserTie;
                   return (
                     <div key={idx} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className="text-white/50 text-sm" />
-                        <span className="text-white text-sm">{item.type}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-white font-semibold">{item.count}</span>
-                        <span className="text-white/40 text-xs">{item.percentage}%</span>
-                      </div>
+                      <div className="flex items-center gap-2"><Icon className="text-white/50 text-sm" /><span className="text-white text-sm">{item.type}</span></div>
+                      <div className="flex items-center gap-3"><span className="text-white font-semibold">{item.count}</span><span className="text-white/40 text-xs">{item.percentage}%</span></div>
                     </div>
                   );
                 })
-              ) : (
-                <p className="text-white/40 text-sm text-center py-4">No data</p>
-              )}
+              ) : <p className="text-white/40 text-sm text-center py-4">No data</p>}
             </div>
           </div>
-
-          {/* Quick Insights */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FaIdCard className="text-[#7A0019] text-sm" />
-              <h3 className="font-semibold text-gray-800 text-sm">Quick Insights</h3>
-            </div>
+            <div className="flex items-center gap-2 mb-3"><FaIdCard className="text-[#7A0019] text-sm" /><h3 className="font-semibold text-gray-800 text-sm">Quick Insights</h3></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-500">Students</p>
-                <p className="text-xl font-bold text-gray-800">
-                  {dashboardData.userTypeDistribution.find(u => u.type === 'Student')?.count || 0}
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-500">Alumni</p>
-                <p className="text-xl font-bold text-gray-800">
-                  {dashboardData.userTypeDistribution.find(u => u.type === 'Alumni')?.count || 0}
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-500">Document Types</p>
-                <p className="text-xl font-bold text-gray-800">
-                  {dashboardData.documentDistribution.filter(d => d.count > 0).length}
-                </p>
-              </div>
-              <div className="bg-amber-50 rounded-lg p-3">
+              <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Students</p><p className="text-xl font-bold text-gray-800">{dashboardData.userTypeDistribution.find(u => u.type === 'Student')?.count || 0}</p></div>
+              <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Alumni</p><p className="text-xl font-bold text-gray-800">{dashboardData.userTypeDistribution.find(u => u.type === 'Alumni')?.count || 0}</p></div>
+              <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Document Types</p><p className="text-xl font-bold text-gray-800">{dashboardData.documentDistribution.filter(d => d.count > 0).length}</p></div>
+              <div className="bg-amber-50 rounded-lg p-3 cursor-pointer hover:bg-amber-100 transition" onClick={() => handleStatCardClick('pending')}>
                 <p className="text-xs text-amber-600">Pending Action</p>
                 <p className="text-xl font-bold text-amber-700">{dashboardData.pending}</p>
               </div>
